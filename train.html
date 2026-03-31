@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Station!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 60%, #7BC67E 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ===== START SCREEN ===== */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 500; color: white;
+        }
+        .overlay.hidden { display: none; }
+        .overlay h1 { font-size: 4rem; color: #FFD700; text-shadow: 3px 3px #333; margin-bottom: 10px; }
+        .overlay .sub { font-size: 1.4rem; color: #fff; margin-bottom: 30px; opacity: 0.9; }
+        .overlay button {
+            padding: 20px 50px; font-size: 2rem; font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #4CAF50, #45a049); color: white;
+            border: none; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 6px #2d6a2f; transition: all 0.1s;
+        }
+        .overlay button:active { box-shadow: 0 3px #2d6a2f; transform: translateY(3px); }
+
+        /* ===== PROGRESS BAR ===== */
+        #progress-bar {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 100;
+            background: rgba(255,255,255,0.95); padding: 10px 20px;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        .stop {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: #e0e0e0; display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; color: #999; position: relative;
+            border: 3px solid #ccc; transition: all 0.4s;
+        }
+        .stop.current { background: #FFD700; border-color: #FFA000; color: #333; transform: scale(1.2); }
+        .stop.correct { background: #4CAF50; border-color: #388E3C; color: white; }
+        .stop.wrong { background: #f44336; border-color: #c62828; color: white; }
+        .stop-connector {
+            width: 20px; height: 4px; background: #ccc; border-radius: 2px;
+        }
+        .stop-connector.passed { background: #4CAF50; }
+
+        /* ===== STATION LABEL ===== */
+        #station-label {
+            position: fixed; top: 68px; left: 50%; transform: translateX(-50%);
+            background: #5D4037; color: #FFD700; padding: 8px 28px;
+            border-radius: 12px; font-size: 1.3rem; z-index: 100;
+            border: 3px solid #3E2723; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* ===== GAME AREA ===== */
+        #game-area {
+            display: none;
+            width: 100%; height: 100vh;
+            flex-direction: column; align-items: center; justify-content: center;
+            padding-top: 110px;
+        }
+        #game-area.active { display: flex; }
+
+        /* ===== PROMPTS ===== */
+        #prompts {
+            display: flex; gap: 40px; margin-bottom: 20px; width: 90%; max-width: 900px;
+            justify-content: center;
+        }
+        .prompt-card {
+            background: white; border-radius: 20px; padding: 14px 24px;
+            text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            font-size: 1.2rem; color: #333; flex: 1; max-width: 400px;
+            border: 4px solid transparent; transition: all 0.3s;
+        }
+        .prompt-card.remove { border-color: #f44336; }
+        .prompt-card.add { border-color: #4CAF50; }
+        .prompt-card .label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+        .prompt-card.remove .label { color: #f44336; }
+        .prompt-card.add .label { color: #4CAF50; }
+        .prompt-card .item-name { font-size: 1.5rem; }
+
+        /* ===== TRAIN ===== */
+        #train-scene {
+            width: 90%; max-width: 900px; position: relative;
+            height: 160px; margin-bottom: 16px;
+        }
+        #train-container {
+            display: flex; align-items: flex-end; justify-content: center;
+            height: 100%; transition: transform 0.6s ease-in-out;
+        }
+        .engine {
+            width: 90px; height: 90px;
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: -2px; flex-shrink: 0;
+        }
+        .engine-face { font-size: 5rem; line-height: 1; }
+        .smoke {
+            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+            font-size: 1.4rem; opacity: 0.6; animation: smokeRise 1.5s ease-out infinite;
+        }
+        .smoke2 {
+            position: absolute; top: -14px; left: 35%; transform: translateX(-50%);
+            font-size: 1rem; opacity: 0.4; animation: smokeRise 2s ease-out infinite 0.5s;
+        }
+        @keyframes smokeRise {
+            0% { transform: translateX(-50%) translateY(0) scale(1); opacity: 0.6; }
+            100% { transform: translateX(-50%) translateY(-25px) scale(1.8); opacity: 0; }
+        }
+
+        .car {
+            width: 120px; height: 90px; border-radius: 10px;
+            position: relative; display: flex; align-items: center; justify-content: center;
+            margin-left: -2px; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+            border: 3px solid rgba(0,0,0,0.15);
+        }
+        .car::after {
+            content: ''; position: absolute; bottom: -10px; left: 10px; right: 10px;
+            height: 14px; background: #555; border-radius: 7px;
+        }
+        .car:hover { transform: translateY(-6px); filter: brightness(1.1); }
+        .car .car-item {
+            font-size: 2.8rem; transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .car.shake { animation: shake 0.5s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px) rotate(-3deg); }
+            40% { transform: translateX(8px) rotate(3deg); }
+            60% { transform: translateX(-5px) rotate(-2deg); }
+            80% { transform: translateX(5px) rotate(2deg); }
+        }
+        .car.correct-pop .car-item { animation: popOut 0.4s ease; }
+        @keyframes popOut {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(0); }
+        }
+
+        /* ===== TRACKS ===== */
+        #tracks {
+            width: 95%; max-width: 960px; height: 20px;
+            background: repeating-linear-gradient(90deg, #8B4513 0px, #8B4513 40px, #A0522D 40px, #A0522D 50px);
+            border-radius: 4px; margin-bottom: 16px; position: relative;
+        }
+        #tracks::before {
+            content: ''; position: absolute; top: 4px; left: 0; right: 0;
+            height: 4px; background: repeating-linear-gradient(90deg, #666 0px, #666 30px, transparent 30px, transparent 35px);
+        }
+        #tracks::after {
+            content: ''; position: absolute; bottom: 4px; left: 0; right: 0;
+            height: 4px; background: repeating-linear-gradient(90deg, #666 0px, #666 30px, transparent 30px, transparent 35px);
+        }
+
+        /* ===== PLATFORM (items to add) ===== */
+        #platform {
+            width: 90%; max-width: 900px;
+            background: rgba(255,255,255,0.9); border-radius: 20px;
+            padding: 16px; display: flex; gap: 12px; justify-content: center;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            border: 3px solid #a5d6a7;
+        }
+        #platform-label {
+            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+            background: #4CAF50; color: white; padding: 2px 16px; border-radius: 8px;
+            font-size: 0.85rem; letter-spacing: 1px;
+        }
+        #platform-wrap { position: relative; width: 90%; max-width: 900px; }
+        .platform-item {
+            width: 90px; height: 90px; background: white;
+            border: 3px solid #ddd; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.8rem; cursor: pointer; transition: all 0.2s;
+        }
+        .platform-item:hover { transform: translateY(-6px) scale(1.05); border-color: #4CAF50; background: #e8f5e9; }
+        .platform-item.shake { animation: shake 0.5s ease-in-out; }
+
+        /* ===== FEEDBACK ===== */
+        #feedback {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            font-size: 5rem; z-index: 300; transition: transform 0.3s ease;
+            pointer-events: none;
+        }
+        #feedback.show { transform: translate(-50%, -50%) scale(1); }
+
+        /* ===== TRAIN ARRIVING/DEPARTING ===== */
+        #train-container.offscreen {
+            transform: translateX(120%);
+        }
+        #train-container.arriving {
+            animation: trainArrive 1s ease-out forwards;
+        }
+        @keyframes trainArrive {
+            0% { transform: translateX(120%); }
+            100% { transform: translateX(0); }
+        }
+        #train-container.departing {
+            animation: trainDepart 1s ease-in forwards;
+        }
+        @keyframes trainDepart {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-120%); }
+        }
+
+        /* ===== END SCREEN ===== */
+        .end-stats { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+        .end-stop {
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; color: white;
+        }
+        .end-stop.correct { background: #4CAF50; }
+        .end-stop.wrong { background: #f44336; }
+        .final-score { font-size: 2rem; color: #FFD700; margin: 10px 0 20px; }
+
+        /* ===== PHASE INDICATOR ===== */
+        #phase-indicator {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 2rem; color: white; background: rgba(0,0,0,0.7);
+            padding: 16px 32px; border-radius: 16px; z-index: 200;
+            display: none; text-align: center;
+        }
+        #phase-indicator.show { display: block; animation: fadeInOut 1.5s ease forwards; }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+        }
+
+        /* car colors */
+        .car-red { background: #ef5350; }
+        .car-blue { background: #42a5f5; }
+        .car-green { background: #66bb6a; }
+        .car-yellow { background: #ffee58; }
+        .car-purple { background: #ab47bc; }
+
+        /* responsive */
+        @media (max-width: 700px) {
+            #prompts { flex-direction: column; align-items: center; gap: 10px; }
+            .car { width: 80px; height: 65px; }
+            .car .car-item { font-size: 2rem; }
+            .engine { width: 70px; height: 70px; }
+            .platform-item { width: 65px; height: 65px; font-size: 2rem; }
+            .prompt-card .item-name { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div class="overlay" id="start-screen">
+    <h1>Train Station!</h1>
+    <p class="sub">Load and unload the train at every stop!</p>
+    <button onclick="startGame()">ALL ABOARD!</button>
+</div>
+
+<!-- END SCREEN -->
+<div class="overlay hidden" id="end-screen">
+    <h1 id="end-title">You Made It!</h1>
+    <div class="end-stats" id="end-stats"></div>
+    <div class="final-score" id="final-score"></div>
+    <button onclick="restartGame()">PLAY AGAIN</button>
+</div>
+
+<!-- PROGRESS BAR -->
+<div id="progress-bar"></div>
+<div id="station-label">Station 1</div>
+
+<!-- PHASE INDICATOR -->
+<div id="phase-indicator"></div>
+
+<!-- FEEDBACK -->
+<div id="feedback"></div>
+
+<!-- GAME AREA -->
+<div id="game-area">
+    <!-- Prompts -->
+    <div id="prompts">
+        <div class="prompt-card remove" id="remove-prompt">
+            <div class="label">Remove from train</div>
+            <div class="item-name" id="remove-target">?</div>
+        </div>
+        <div class="prompt-card add" id="add-prompt">
+            <div class="label">Add to train</div>
+            <div class="item-name" id="add-target">?</div>
+        </div>
+    </div>
+
+    <!-- Train -->
+    <div id="train-scene">
+        <div id="train-container">
+            <div class="engine">
+                <div class="smoke">&#x1F4A8;</div>
+                <div class="smoke2">&#x2601;&#xFE0F;</div>
+                <div class="engine-face">&#x1F682;</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracks -->
+    <div id="tracks"></div>
+
+    <!-- Platform -->
+    <div id="platform-wrap">
+        <div id="platform-label">PLATFORM - Pick one to load!</div>
+        <div id="platform"></div>
+    </div>
+</div>
+
+<script>
+// ===== ITEM POOL =====
+const ITEMS = [
+    // shapes with colors
+    { name: 'Red Circle', emoji: '\u{1F534}', category: 'shape' },
+    { name: 'Blue Circle', emoji: '\u{1F535}', category: 'shape' },
+    { name: 'Green Circle', emoji: '\u{1F7E2}', category: 'shape' },
+    { name: 'Yellow Circle', emoji: '\u{1F7E1}', category: 'shape' },
+    { name: 'Purple Circle', emoji: '\u{1F7E3}', category: 'shape' },
+    { name: 'Orange Circle', emoji: '\u{1F7E0}', category: 'shape' },
+    { name: 'Red Square', emoji: '\u{1F7E5}', category: 'shape' },
+    { name: 'Blue Square', emoji: '\u{1F7E6}', category: 'shape' },
+    { name: 'Green Square', emoji: '\u{1F7E9}', category: 'shape' },
+    { name: 'Yellow Square', emoji: '\u{1F7E8}', category: 'shape' },
+    { name: 'Purple Square', emoji: '\u{1F7EA}', category: 'shape' },
+    { name: 'Orange Square', emoji: '\u{1F7E7}', category: 'shape' },
+    { name: 'Red Triangle', emoji: '\u{1F53A}', category: 'shape' },
+    { name: 'Blue Diamond', emoji: '\u{1F539}', category: 'shape' },
+    { name: 'Orange Diamond', emoji: '\u{1F536}', category: 'shape' },
+    { name: 'Blue Diamond', emoji: '\u{1F537}', category: 'shape' },
+    { name: 'Star', emoji: '\u2B50', category: 'shape' },
+    { name: 'Glowing Star', emoji: '\u{1F31F}', category: 'shape' },
+    { name: 'Heart', emoji: '\u2764\uFE0F', category: 'shape' },
+    { name: 'Blue Heart', emoji: '\u{1F499}', category: 'shape' },
+    { name: 'Green Heart', emoji: '\u{1F49A}', category: 'shape' },
+    { name: 'Yellow Heart', emoji: '\u{1F49B}', category: 'shape' },
+    { name: 'Purple Heart', emoji: '\u{1F49C}', category: 'shape' },
+
+    // animals
+    { name: 'Lion', emoji: '\u{1F981}', category: 'animal' },
+    { name: 'Bear', emoji: '\u{1F43B}', category: 'animal' },
+    { name: 'Cat', emoji: '\u{1F431}', category: 'animal' },
+    { name: 'Dog', emoji: '\u{1F436}', category: 'animal' },
+    { name: 'Fish', emoji: '\u{1F41F}', category: 'animal' },
+    { name: 'Bird', emoji: '\u{1F426}', category: 'animal' },
+    { name: 'Frog', emoji: '\u{1F438}', category: 'animal' },
+    { name: 'Monkey', emoji: '\u{1F435}', category: 'animal' },
+    { name: 'Pig', emoji: '\u{1F437}', category: 'animal' },
+    { name: 'Cow', emoji: '\u{1F42E}', category: 'animal' },
+    { name: 'Rabbit', emoji: '\u{1F430}', category: 'animal' },
+    { name: 'Fox', emoji: '\u{1F98A}', category: 'animal' },
+    { name: 'Penguin', emoji: '\u{1F427}', category: 'animal' },
+    { name: 'Elephant', emoji: '\u{1F418}', category: 'animal' },
+    { name: 'Turtle', emoji: '\u{1F422}', category: 'animal' },
+    { name: 'Butterfly', emoji: '\u{1F98B}', category: 'animal' },
+    { name: 'Unicorn', emoji: '\u{1F984}', category: 'animal' },
+    { name: 'Dinosaur', emoji: '\u{1F995}', category: 'animal' },
+
+    // letters
+    { name: 'Letter A', emoji: '\u{1F170}\uFE0F', category: 'letter' },
+    { name: 'Letter B', emoji: '\u{1F171}\uFE0F', category: 'letter' },
+    { name: 'Letter M', emoji: '\u24C2\uFE0F', category: 'letter' },
+
+    // numbers
+    { name: 'Number 1', emoji: '1\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 2', emoji: '2\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 3', emoji: '3\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 4', emoji: '4\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 5', emoji: '5\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 6', emoji: '6\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 7', emoji: '7\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 8', emoji: '8\uFE0F\u20E3', category: 'number' },
+    { name: 'Number 9', emoji: '9\uFE0F\u20E3', category: 'number' },
+
+    // food
+    { name: 'Apple', emoji: '\u{1F34E}', category: 'food' },
+    { name: 'Banana', emoji: '\u{1F34C}', category: 'food' },
+    { name: 'Grapes', emoji: '\u{1F347}', category: 'food' },
+    { name: 'Watermelon', emoji: '\u{1F349}', category: 'food' },
+    { name: 'Pizza', emoji: '\u{1F355}', category: 'food' },
+    { name: 'Cookie', emoji: '\u{1F36A}', category: 'food' },
+    { name: 'Ice Cream', emoji: '\u{1F366}', category: 'food' },
+    { name: 'Cupcake', emoji: '\u{1F9C1}', category: 'food' },
+];
+
+const TOTAL_STOPS = 10;
+const CARS_COUNT = 5;
+const CAR_COLORS = ['car-red', 'car-blue', 'car-green', 'car-yellow', 'car-purple'];
+
+let currentStop = 0;
+let phase = 'remove'; // 'remove' or 'add'
+let trainItems = []; // what's on the train (5 items)
+let removeTarget = null;
+let addTarget = null;
+let platformItems = [];
+let results = [];
+let currentMistakes = 0;
+let locked = false;
+
+// ===== HELPERS =====
+function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+}
+
+function pickRandom(arr, n, exclude) {
+    exclude = exclude || [];
+    var pool = arr.filter(function(i) {
+        return !exclude.some(function(e) { return e.emoji === i.emoji; });
+    });
+    return shuffle(pool).slice(0, n);
+}
+
+function showFeedback(type) {
+    var fb = document.getElementById('feedback');
+    fb.textContent = type === 'correct' ? '\u2705' : '\u274C';
+    fb.classList.add('show');
+    setTimeout(function() { fb.classList.remove('show'); }, 600);
+}
+
+function showPhase(text) {
+    return new Promise(function(resolve) {
+        var el = document.getElementById('phase-indicator');
+        el.textContent = text;
+        el.classList.add('show');
+        el.style.display = 'block';
+        setTimeout(function() {
+            el.classList.remove('show');
+            el.style.display = 'none';
+            resolve();
+        }, 1500);
+    });
+}
+
+// ===== PROGRESS BAR =====
+function buildProgressBar() {
+    var bar = document.getElementById('progress-bar');
+    bar.textContent = '';
+    for (var i = 0; i < TOTAL_STOPS; i++) {
+        if (i > 0) {
+            var conn = document.createElement('div');
+            conn.className = 'stop-connector';
+            conn.id = 'conn-' + i;
+            bar.appendChild(conn);
+        }
+        var stop = document.createElement('div');
+        stop.className = 'stop';
+        stop.id = 'stop-' + i;
+        stop.textContent = i + 1;
+        bar.appendChild(stop);
+    }
+}
+
+function updateProgress() {
+    for (var i = 0; i < TOTAL_STOPS; i++) {
+        var stop = document.getElementById('stop-' + i);
+        stop.className = 'stop';
+        if (i < currentStop) {
+            var r = results[i];
+            if (r && r.mistakes > 0) {
+                stop.className = 'stop wrong';
+                stop.textContent = '\u2717';
+            } else if (r) {
+                stop.className = 'stop correct';
+                stop.textContent = '\u2713';
+            }
+            if (i > 0) document.getElementById('conn-' + i).classList.add('passed');
+        } else if (i === currentStop) {
+            stop.className = 'stop current';
+            stop.textContent = i + 1;
+        }
+    }
+    document.getElementById('station-label').textContent = 'Station ' + (currentStop + 1);
+}
+
+// ===== RENDER TRAIN =====
+function renderTrain() {
+    var container = document.getElementById('train-container');
+    var cars = container.querySelectorAll('.car');
+    for (var c = 0; c < cars.length; c++) cars[c].remove();
+
+    trainItems.forEach(function(item, idx) {
+        var car = document.createElement('div');
+        car.className = 'car ' + CAR_COLORS[idx];
+        car.setAttribute('data-index', idx);
+        var carItem = document.createElement('div');
+        carItem.className = 'car-item';
+        carItem.textContent = item.emoji;
+        car.appendChild(carItem);
+        car.addEventListener('click', function() { onTrainCarClick(idx); });
+        container.appendChild(car);
+    });
+}
+
+// ===== RENDER PLATFORM =====
+function renderPlatform() {
+    var platform = document.getElementById('platform');
+    platform.textContent = '';
+    platformItems.forEach(function(item, idx) {
+        var el = document.createElement('div');
+        el.className = 'platform-item';
+        el.setAttribute('data-index', idx);
+        el.textContent = item.emoji;
+        el.addEventListener('click', function() { onPlatformClick(idx); });
+        platform.appendChild(el);
+    });
+}
+
+// ===== PROMPTS =====
+function updatePrompts() {
+    var removeEl = document.getElementById('remove-target');
+    var addEl = document.getElementById('add-target');
+    var removeCard = document.getElementById('remove-prompt');
+    var addCard = document.getElementById('add-prompt');
+    var platformWrap = document.getElementById('platform-wrap');
+
+    if (phase === 'remove') {
+        removeCard.style.opacity = '1';
+        removeCard.style.transform = 'scale(1.05)';
+        addCard.style.opacity = '0.4';
+        addCard.style.transform = 'scale(1)';
+        platformWrap.style.opacity = '0.3';
+        platformWrap.style.pointerEvents = 'none';
+        removeEl.textContent = removeTarget ? removeTarget.emoji + ' ' + removeTarget.name : '?';
+        addEl.textContent = addTarget ? addTarget.emoji + ' ' + addTarget.name : '?';
+    } else {
+        removeCard.style.opacity = '0.4';
+        removeCard.style.transform = 'scale(1)';
+        addCard.style.opacity = '1';
+        addCard.style.transform = 'scale(1.05)';
+        platformWrap.style.opacity = '1';
+        platformWrap.style.pointerEvents = 'auto';
+        removeEl.textContent = '\u2713 Done!';
+        addEl.textContent = addTarget ? addTarget.emoji + ' ' + addTarget.name : '?';
+    }
+}
+
+// ===== SETUP A STOP =====
+function setupStop() {
+    currentMistakes = 0;
+    phase = 'remove';
+
+    // pick item to remove from train
+    var removeIdx = Math.floor(Math.random() * trainItems.length);
+    removeTarget = trainItems[removeIdx];
+
+    // pick item to add (not already on train)
+    addTarget = pickRandom(ITEMS, 1, trainItems)[0];
+
+    // build platform: addTarget + 4 distractors
+    var distractors = pickRandom(ITEMS, 4, trainItems.concat([addTarget]));
+    platformItems = shuffle([addTarget].concat(distractors));
+
+    renderTrain();
+    renderPlatform();
+    updatePrompts();
+    updateProgress();
+}
+
+// ===== CLICK HANDLERS =====
+function onTrainCarClick(idx) {
+    if (locked || phase !== 'remove') return;
+    var car = document.querySelector('.car[data-index="' + idx + '"]');
+
+    if (trainItems[idx].emoji === removeTarget.emoji) {
+        locked = true;
+        showFeedback('correct');
+        car.classList.add('correct-pop');
+        setTimeout(function() {
+            trainItems.splice(idx, 1);
+            phase = 'add';
+            updatePrompts();
+            renderTrain();
+            locked = false;
+        }, 500);
+    } else {
+        currentMistakes++;
+        showFeedback('wrong');
+        car.classList.add('shake');
+        setTimeout(function() { car.classList.remove('shake'); }, 500);
+    }
+}
+
+function onPlatformClick(idx) {
+    if (locked || phase !== 'add') return;
+    var el = document.querySelectorAll('.platform-item')[idx];
+
+    if (platformItems[idx].emoji === addTarget.emoji) {
+        locked = true;
+        showFeedback('correct');
+        el.style.background = '#c8e6c9';
+        el.style.transform = 'scale(1.2)';
+        setTimeout(function() {
+            trainItems.push(addTarget);
+            results[currentStop] = { mistakes: currentMistakes };
+            renderTrain();
+            updateProgress();
+            locked = false;
+            advanceToNextStop();
+        }, 500);
+    } else {
+        currentMistakes++;
+        showFeedback('wrong');
+        el.classList.add('shake');
+        setTimeout(function() { el.classList.remove('shake'); }, 500);
+    }
+}
+
+// ===== ADVANCE =====
+function advanceToNextStop() {
+    currentStop++;
+    if (currentStop >= TOTAL_STOPS) {
+        endGame();
+        return;
+    }
+
+    locked = true;
+    var container = document.getElementById('train-container');
+    container.classList.add('departing');
+
+    setTimeout(function() {
+        // keep train offscreen while showing station label
+        container.classList.remove('departing');
+        container.classList.add('offscreen');
+
+        showPhase('Station ' + (currentStop + 1) + ' \u{1F689}').then(function() {
+            container.classList.remove('offscreen');
+            container.classList.add('arriving');
+            setTimeout(function() {
+                container.classList.remove('arriving');
+                locked = false;
+                setupStop();
+            }, 1000);
+        });
+    }, 1000);
+}
+
+// ===== END GAME =====
+function endGame() {
+    document.getElementById('game-area').classList.remove('active');
+    var endScreen = document.getElementById('end-screen');
+    endScreen.classList.remove('hidden');
+
+    var statsEl = document.getElementById('end-stats');
+    statsEl.textContent = '';
+    var perfect = 0;
+
+    results.forEach(function(r) {
+        var div = document.createElement('div');
+        div.className = 'end-stop ' + (r.mistakes === 0 ? 'correct' : 'wrong');
+        div.textContent = r.mistakes === 0 ? '\u2713' : '\u2717';
+        statsEl.appendChild(div);
+        if (r.mistakes === 0) perfect++;
+    });
+
+    var scoreEl = document.getElementById('final-score');
+    var titleEl = document.getElementById('end-title');
+    scoreEl.textContent = perfect + ' / ' + TOTAL_STOPS + ' perfect stops!';
+
+    if (perfect === TOTAL_STOPS) {
+        titleEl.textContent = '\u{1F389} PERFECT RIDE! \u{1F389}';
+    } else if (perfect >= 7) {
+        titleEl.textContent = '\u{1F682} Great Job! \u{1F31F}';
+    } else {
+        titleEl.textContent = '\u{1F682} You Made It! \u{1F389}';
+    }
+}
+
+// ===== START / RESTART =====
+function startGame() {
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('end-screen').classList.add('hidden');
+    document.getElementById('game-area').classList.add('active');
+
+    currentStop = 0;
+    results = [];
+    buildProgressBar();
+
+    trainItems = pickRandom(ITEMS, CARS_COUNT);
+
+    locked = true;
+    showPhase('Station 1 \u{1F689}').then(function() {
+        var container = document.getElementById('train-container');
+        container.classList.add('arriving');
+        setTimeout(function() {
+            container.classList.remove('arriving');
+            locked = false;
+            setupStop();
+        }, 1000);
+    });
+}
+
+function restartGame() {
+    startGame();
+}
+</script>
+</body>
+</html>

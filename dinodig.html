@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dino Dig!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(180deg, #87CEEB 0%, #D2B48C 40%, #A0522D 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ===== OVERLAYS ===== */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 500; color: white; text-align: center;
+            padding: 20px;
+        }
+        .overlay.hidden { display: none; }
+        .overlay h1 {
+            font-size: 3.5rem; color: #FFD700;
+            text-shadow: 3px 3px #333; margin-bottom: 10px;
+        }
+        .overlay .sub {
+            font-size: 1.4rem; color: #fff;
+            margin-bottom: 30px; opacity: 0.9;
+            max-width: 500px; line-height: 1.4;
+        }
+        .overlay button {
+            padding: 20px 50px; font-size: 2rem; font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #4CAF50, #45a049); color: white;
+            border: none; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 6px #2d6a2f; transition: all 0.1s;
+        }
+        .overlay button:active {
+            box-shadow: 0 3px #2d6a2f; transform: translateY(3px);
+        }
+        .play-btn { animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .play-btn:active { animation: none; }
+
+        /* ===== REVEAL CARD ===== */
+        #reveal-screen {
+            padding: 20px;
+        }
+        .reveal-card {
+            background: linear-gradient(135deg, #2c1810, #4a2c1a);
+            border-radius: 24px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90vw;
+            border: 4px solid #FFD700;
+            box-shadow: 0 0 40px rgba(255,215,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: slideUp 0.5s ease-out;
+        }
+        @keyframes slideUp {
+            0% { transform: translateY(100px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .reveal-card .reveal-img-container {
+            width: 100%;
+            height: 250px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            background: #1a0e08;
+        }
+        .reveal-card .reveal-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+        }
+        .reveal-img-fallback {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8rem;
+            border-radius: 16px;
+        }
+        .dino-name {
+            font-size: 2.2rem; color: #FF7043; margin-bottom: 8px;
+        }
+        .dino-fact {
+            font-size: 1.1rem; color: #FFF9C4; margin-bottom: 30px;
+            max-width: 440px; line-height: 1.5; text-align: center;
+        }
+
+        /* ===== PROGRESS BAR ===== */
+        #progress-bar {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 100;
+            background: rgba(255,255,255,0.95); padding: 10px 20px;
+            display: none; align-items: center; justify-content: center; gap: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+        #progress-bar.active { display: flex; }
+        .stop {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: #e0e0e0; display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; color: #999; position: relative;
+            border: 3px solid #ccc; transition: all 0.4s;
+        }
+        .stop.current {
+            background: #FFD700; border-color: #FFA000; color: #333;
+            transform: scale(1.2);
+        }
+        .stop.done {
+            background: #4CAF50; border-color: #388E3C; color: white;
+        }
+        .stop-connector {
+            width: 20px; height: 4px; background: #ccc; border-radius: 2px;
+        }
+        .stop-connector.passed { background: #4CAF50; }
+
+        /* ===== DIG LABEL ===== */
+        #dig-label {
+            position: fixed; top: 68px; left: 50%; transform: translateX(-50%);
+            background: #5D4037; color: #FFD700; padding: 8px 28px;
+            border-radius: 12px; font-size: 1.3rem; z-index: 100;
+            border: 3px solid #3E2723; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: none;
+        }
+        #dig-label.active { display: block; }
+
+        /* ===== DIG PERCENT ===== */
+        #dig-percent {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(93,64,55,0.9); color: #FFD700; padding: 6px 20px;
+            border-radius: 20px; font-size: 1rem; z-index: 100;
+            border: 2px solid #3E2723;
+            display: none;
+            transition: all 0.3s;
+        }
+        #dig-percent.active { display: block; }
+        #dig-percent .bar-bg {
+            display: inline-block;
+            width: 100px; height: 10px;
+            background: #3E2723;
+            border-radius: 5px;
+            vertical-align: middle;
+            margin-left: 8px;
+            overflow: hidden;
+        }
+        #dig-percent .bar-fill {
+            display: block;
+            height: 100%;
+            width: 0%;
+            background: #FFD700;
+            border-radius: 5px;
+            transition: width 0.2s;
+        }
+
+        /* ===== GAME AREA ===== */
+        #game-area {
+            display: none;
+            width: 100%; min-height: 100vh;
+            flex-direction: column; align-items: center; justify-content: center;
+            padding-top: 110px; padding-bottom: 60px;
+        }
+        #game-area.active { display: flex; }
+
+        #dig-container {
+            position: relative;
+            width: min(90vw, 560px);
+            aspect-ratio: 10 / 8;
+            max-height: min(65vh, 450px);
+            border-radius: 16px;
+            border: 4px solid #8B6914;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        /* Fossil image behind the grid */
+        #fossil-image {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+        #fossil-fallback {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            overflow: hidden;
+        }
+        #fossil-fallback .fb-emoji {
+            font-size: min(30vw, 200px);
+            filter: grayscale(0.6) sepia(0.8) brightness(0.7);
+            opacity: 0.8;
+        }
+        /* Scattered bones in the background */
+        #fossil-fallback .bone-scatter {
+            position: absolute;
+            font-size: 2rem;
+            opacity: 0.3;
+        }
+
+        #dig-grid {
+            position: absolute;
+            top: 0; left: 0;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 0px;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        .dirt-cell {
+            cursor: pointer;
+            transition: transform 0.08s;
+            opacity: 1;
+        }
+        .dirt-cell:active { transform: scale(0.9); }
+        .dirt-cell:hover { filter: brightness(1.15); }
+
+        /* Dirt color variations */
+        .dirt-a { background: linear-gradient(135deg, #8B6B3D, #6B4226); }
+        .dirt-b { background: linear-gradient(135deg, #7A5B30, #5C3620); }
+        .dirt-c { background: linear-gradient(135deg, #966B3D, #7B5230); }
+        .dirt-d { background: linear-gradient(135deg, #6B5030, #5A3A1A); }
+        .dirt-e { background: linear-gradient(135deg, #8B7040, #6B5028); }
+
+        /* Poof animation */
+        @keyframes poof {
+            0% { transform: scale(1); opacity: 1; }
+            30% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .dirt-poof {
+            animation: poof 0.3s ease-out forwards;
+            pointer-events: none !important;
+        }
+
+        .dirt-gone {
+            opacity: 0;
+            pointer-events: none !important;
+            cursor: default;
+        }
+
+        /* Celebration particles */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+            100% { opacity: 0; transform: translateY(-220px) scale(0.4) rotate(30deg); }
+        }
+        .particle {
+            position: fixed; font-size: 2rem; z-index: 400;
+            pointer-events: none;
+            animation: floatUp 2s ease-out forwards;
+        }
+
+        /* Completion screen */
+        .completion-dinos {
+            font-size: 3rem; margin-bottom: 20px; letter-spacing: 10px;
+        }
+
+        /* Hint text */
+        #hint-text {
+            margin-top: 12px;
+            font-size: 1rem;
+            color: #5D4037;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+            display: none;
+        }
+        #hint-text.active { display: block; }
+
+        /* Glow animation when near completion */
+        @keyframes borderGlow {
+            0%, 100% { border-color: #8B6914; box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+            50% { border-color: #FFD700; box-shadow: 0 0 25px rgba(255,215,0,0.5); }
+        }
+        #dig-container.almost-done {
+            animation: borderGlow 1s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+
+<script>
+(function() {
+    "use strict";
+
+    var COLS = 10;
+    var ROWS = 8;
+    var REVEAL_THRESHOLD = 0.55;
+    var TOTAL_CELLS = COLS * ROWS;
+
+    var DINOS = [
+        {
+            name: 'T-Rex',
+            emoji: '\u{1F996}',
+            fossilImg: 'images/dinos/trex-fossil.jpg',
+            realImg: 'images/dinos/trex-real.jpg',
+            fact: 'T-Rex had teeth as long as bananas and could bite with 12,800 pounds of force!',
+            gradient: 'linear-gradient(135deg, #FF6B35, #D32F2F)'
+        },
+        {
+            name: 'Triceratops',
+            emoji: '\u{1F995}',
+            fossilImg: 'images/dinos/triceratops-fossil.jpg',
+            realImg: 'images/dinos/triceratops-real.jpg',
+            fact: 'Triceratops had up to 800 teeth and three horns on its face!',
+            gradient: 'linear-gradient(135deg, #66BB6A, #2E7D32)'
+        },
+        {
+            name: 'Stegosaurus',
+            emoji: '\u{1F995}',
+            fossilImg: 'images/dinos/fossil-bones.jpg',
+            realImg: 'images/dinos/stego-real.jpg',
+            fact: 'Stegosaurus had a brain the size of a walnut but was as big as a bus!',
+            gradient: 'linear-gradient(135deg, #42A5F5, #1565C0)'
+        },
+        {
+            name: 'Brachiosaurus',
+            emoji: '\u{1F995}',
+            fossilImg: 'images/dinos/brachio-fossil.jpg',
+            realImg: 'images/dinos/brachio-real.jpg',
+            fact: 'Brachiosaurus was as tall as a 4-story building and weighed 80,000 pounds!',
+            gradient: 'linear-gradient(135deg, #AB47BC, #6A1B9A)'
+        },
+        {
+            name: 'Velociraptor',
+            emoji: '\u{1F996}',
+            fossilImg: 'images/dinos/fossil-skull.jpg',
+            realImg: 'images/dinos/raptor-real.jpg',
+            fact: 'Velociraptor was actually the size of a turkey, not as big as in the movies!',
+            gradient: 'linear-gradient(135deg, #FFA726, #E65100)'
+        },
+        {
+            name: 'Pteranodon',
+            emoji: '\u{1F995}',
+            fossilImg: 'images/dinos/fossil-museum2.jpg',
+            realImg: 'images/dinos/ptero-real.jpg',
+            fact: 'Pteranodon had a wingspan of 23 feet but weighed only 55 pounds!',
+            gradient: 'linear-gradient(135deg, #26C6DA, #00838F)'
+        }
+    ];
+
+    var DIRT_CLASSES = ['dirt-a', 'dirt-b', 'dirt-c', 'dirt-d', 'dirt-e'];
+
+    var currentDig = 0;
+    var dugCount = 0;
+    var revealed = false;
+    var dinoOrder = [];
+
+    // Build all DOM elements with createElement/textContent
+
+    // --- Start Screen ---
+    var startScreen = document.createElement("div");
+    startScreen.className = "overlay";
+    startScreen.id = "start-screen";
+
+    var startTitle = document.createElement("h1");
+    startTitle.textContent = "\u{1F995} Dino Dig! \u{1F996}";
+    startScreen.appendChild(startTitle);
+
+    var startSub = document.createElement("div");
+    startSub.className = "sub";
+    startSub.textContent = "Dig up dinosaur fossils hidden underground! Tap the dirt to discover ancient bones!";
+    startScreen.appendChild(startSub);
+
+    var playBtn = document.createElement("button");
+    playBtn.className = "play-btn";
+    playBtn.textContent = "DIG IN! \u26CF\uFE0F";
+    startScreen.appendChild(playBtn);
+
+    document.body.appendChild(startScreen);
+
+    // --- Reveal Screen ---
+    var revealScreen = document.createElement("div");
+    revealScreen.className = "overlay hidden";
+    revealScreen.id = "reveal-screen";
+
+    var revealCard = document.createElement("div");
+    revealCard.className = "reveal-card";
+
+    var revealImgContainer = document.createElement("div");
+    revealImgContainer.className = "reveal-img-container";
+    revealImgContainer.id = "reveal-img-container";
+    revealCard.appendChild(revealImgContainer);
+
+    var revealName = document.createElement("div");
+    revealName.className = "dino-name";
+    revealCard.appendChild(revealName);
+
+    var revealFact = document.createElement("div");
+    revealFact.className = "dino-fact";
+    revealCard.appendChild(revealFact);
+
+    var nextBtn = document.createElement("button");
+    nextBtn.id = "next-btn";
+    nextBtn.textContent = "Next Dig \u26CF\uFE0F";
+    revealCard.appendChild(nextBtn);
+
+    revealScreen.appendChild(revealCard);
+    document.body.appendChild(revealScreen);
+
+    // --- Completion Screen ---
+    var completeScreen = document.createElement("div");
+    completeScreen.className = "overlay hidden";
+    completeScreen.id = "complete-screen";
+
+    var compTitle = document.createElement("h1");
+    compTitle.textContent = "\u{1F3C6} Amazing! \u{1F3C6}";
+    completeScreen.appendChild(compTitle);
+
+    var completionDinos = document.createElement("div");
+    completionDinos.className = "completion-dinos";
+    completeScreen.appendChild(completionDinos);
+
+    var compSub = document.createElement("div");
+    compSub.className = "sub";
+    compSub.textContent = "You found all 6 dinosaurs! You're a real paleontologist!";
+    completeScreen.appendChild(compSub);
+
+    var restartBtn = document.createElement("button");
+    restartBtn.textContent = "Play Again! \u{1F9B4}";
+    completeScreen.appendChild(restartBtn);
+
+    document.body.appendChild(completeScreen);
+
+    // --- Progress Bar ---
+    var progressBar = document.createElement("div");
+    progressBar.id = "progress-bar";
+    document.body.appendChild(progressBar);
+
+    // --- Dig Label ---
+    var digLabel = document.createElement("div");
+    digLabel.id = "dig-label";
+    document.body.appendChild(digLabel);
+
+    // --- Dig Percent Indicator ---
+    var digPercent = document.createElement("div");
+    digPercent.id = "dig-percent";
+
+    var digPercentText = document.createElement("span");
+    digPercentText.id = "dig-percent-text";
+    digPercentText.textContent = "0%";
+    digPercent.appendChild(digPercentText);
+
+    var barBg = document.createElement("span");
+    barBg.className = "bar-bg";
+    var barFill = document.createElement("span");
+    barFill.className = "bar-fill";
+    barBg.appendChild(barFill);
+    digPercent.appendChild(barBg);
+
+    document.body.appendChild(digPercent);
+
+    // --- Game Area ---
+    var gameArea = document.createElement("div");
+    gameArea.id = "game-area";
+
+    var digContainer = document.createElement("div");
+    digContainer.id = "dig-container";
+
+    var fossilImage = document.createElement("img");
+    fossilImage.id = "fossil-image";
+    fossilImage.alt = "Fossil";
+    digContainer.appendChild(fossilImage);
+
+    var fossilFallback = document.createElement("div");
+    fossilFallback.id = "fossil-fallback";
+    digContainer.appendChild(fossilFallback);
+
+    var digGrid = document.createElement("div");
+    digGrid.id = "dig-grid";
+    digContainer.appendChild(digGrid);
+
+    gameArea.appendChild(digContainer);
+
+    var hintText = document.createElement("div");
+    hintText.id = "hint-text";
+    hintText.textContent = "Tap the dirt to dig! \u26CF\uFE0F";
+    gameArea.appendChild(hintText);
+
+    document.body.appendChild(gameArea);
+
+    // --- Utility functions ---
+    function shuffle(arr) {
+        var a = arr.slice();
+        for (var i = a.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+        }
+        return a;
+    }
+
+    function clearChildren(el) {
+        while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    // --- Progress bar ---
+    function buildProgressBar() {
+        clearChildren(progressBar);
+        for (var i = 0; i < 6; i++) {
+            if (i > 0) {
+                var conn = document.createElement("div");
+                conn.className = "stop-connector" + (i <= currentDig ? " passed" : "");
+                progressBar.appendChild(conn);
+            }
+            var stop = document.createElement("div");
+            stop.className = "stop";
+            if (i < currentDig) stop.className += " done";
+            if (i === currentDig) stop.className += " current";
+            stop.textContent = (i < currentDig) ? "\u2713" : String(i + 1);
+            progressBar.appendChild(stop);
+        }
+    }
+
+    // --- Fossil image setup with fallback ---
+    function buildFallback(dino) {
+        clearChildren(fossilFallback);
+        fossilFallback.style.background = "linear-gradient(135deg, #F5DEB3, #D2B48C, #C4A882)";
+
+        // Big dino emoji with fossil filter
+        var bigEmoji = document.createElement("div");
+        bigEmoji.className = "fb-emoji";
+        bigEmoji.textContent = dino.emoji;
+        fossilFallback.appendChild(bigEmoji);
+
+        // Scatter bone emojis around
+        var bones = ["\u{1F9B4}", "\u{1F9B4}", "\u{1F9B4}", "\u{1F9B4}", "\u{1F9B4}", "\u{1F9B4}", "\u{1F9B4}", "\u{1F9B4}"];
+        var positions = [
+            [10,10],[75,15],[20,75],[80,70],[5,45],[90,45],[45,85],[50,10]
+        ];
+        for (var b = 0; b < bones.length; b++) {
+            var boneEl = document.createElement("div");
+            boneEl.className = "bone-scatter";
+            boneEl.textContent = bones[b];
+            boneEl.style.left = positions[b][0] + "%";
+            boneEl.style.top = positions[b][1] + "%";
+            boneEl.style.transform = "rotate(" + (Math.random() * 360) + "deg)";
+            fossilFallback.appendChild(boneEl);
+        }
+    }
+
+    function setupFossilImage(dino) {
+        // Always build fallback first
+        buildFallback(dino);
+
+        fossilImage.style.display = "block";
+        fossilFallback.style.display = "none";
+        fossilImage.src = dino.fossilImg;
+        fossilImage.onerror = function() {
+            fossilImage.style.display = "none";
+            fossilFallback.style.display = "flex";
+        };
+    }
+
+    // --- Build dirt grid ---
+    function buildGrid() {
+        clearChildren(digGrid);
+        dugCount = 0;
+        revealed = false;
+        digContainer.classList.remove("almost-done");
+        updateDigPercent();
+
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                var cell = document.createElement("div");
+                var dirtClass = DIRT_CLASSES[(r * COLS + c + r) % DIRT_CLASSES.length];
+                cell.className = "dirt-cell " + dirtClass;
+                cell.setAttribute("data-idx", String(r * COLS + c));
+                cell.addEventListener("click", onCellClick);
+                cell.addEventListener("touchstart", onCellTouch, { passive: true });
+                digGrid.appendChild(cell);
+            }
+        }
+    }
+
+    function onCellTouch(e) {
+        // Prevent double-fire on mobile
+        var cell = e.currentTarget;
+        if (revealed) return;
+        if (cell.classList.contains("dirt-gone") || cell.classList.contains("dirt-poof")) return;
+        digCell(cell);
+    }
+
+    function onCellClick(e) {
+        if (revealed) return;
+        var cell = e.currentTarget;
+        if (cell.classList.contains("dirt-gone") || cell.classList.contains("dirt-poof")) return;
+        digCell(cell);
+    }
+
+    function digCell(cell) {
+        if (cell.classList.contains("dirt-gone") || cell.classList.contains("dirt-poof")) return;
+
+        cell.classList.add("dirt-poof");
+        cell.removeEventListener("click", onCellClick);
+        cell.removeEventListener("touchstart", onCellTouch);
+
+        setTimeout(function() {
+            cell.classList.remove("dirt-poof");
+            cell.classList.add("dirt-gone");
+            dugCount++;
+            updateDigPercent();
+            checkReveal();
+        }, 280);
+    }
+
+    function updateDigPercent() {
+        var pct = Math.floor((dugCount / TOTAL_CELLS) * 100);
+        digPercentText.textContent = pct + "%";
+        barFill.style.width = pct + "%";
+
+        // Glow border when near threshold
+        if (pct >= 40 && pct < 55) {
+            digContainer.classList.add("almost-done");
+        }
+    }
+
+    function checkReveal() {
+        if (revealed) return;
+        if (dugCount >= Math.ceil(TOTAL_CELLS * REVEAL_THRESHOLD)) {
+            revealed = true;
+            digContainer.classList.remove("almost-done");
+            setTimeout(function() { revealAll(); }, 300);
+        }
+    }
+
+    function revealAll() {
+        var dino = dinoOrder[currentDig];
+        var cells = digGrid.querySelectorAll(".dirt-cell:not(.dirt-gone)");
+        var delay = 0;
+        var cellArr = [];
+        for (var i = 0; i < cells.length; i++) cellArr.push(cells[i]);
+
+        // Shuffle remaining cells for a fun staggered reveal
+        for (var j = cellArr.length - 1; j > 0; j--) {
+            var k = Math.floor(Math.random() * (j + 1));
+            var tmp = cellArr[j]; cellArr[j] = cellArr[k]; cellArr[k] = tmp;
+        }
+
+        for (var m = 0; m < cellArr.length; m++) {
+            (function(cell, d) {
+                setTimeout(function() {
+                    cell.classList.add("dirt-poof");
+                    setTimeout(function() {
+                        cell.classList.remove("dirt-poof");
+                        cell.classList.add("dirt-gone");
+                    }, 280);
+                }, d);
+            })(cellArr[m], delay);
+            delay += 25;
+        }
+
+        spawnParticles();
+
+        // Update percent to 100
+        setTimeout(function() {
+            dugCount = TOTAL_CELLS;
+            updateDigPercent();
+        }, delay);
+
+        setTimeout(function() { showRevealScreen(dino); }, delay + 1000);
+    }
+
+    function spawnParticles() {
+        var emojis = ["\u{1F9B4}", "\u2B50", "\u{1F389}", "\u2728", "\u{1F995}", "\u{1F996}"];
+        for (var i = 0; i < 18; i++) {
+            (function(idx) {
+                setTimeout(function() {
+                    var p = document.createElement("div");
+                    p.className = "particle";
+                    p.textContent = emojis[idx % emojis.length];
+                    p.style.left = (10 + Math.random() * 80) + "vw";
+                    p.style.top = (50 + Math.random() * 40) + "vh";
+                    document.body.appendChild(p);
+                    setTimeout(function() {
+                        if (p.parentNode) p.parentNode.removeChild(p);
+                    }, 2200);
+                }, idx * 80);
+            })(i);
+        }
+    }
+
+    function showRevealScreen(dino) {
+        clearChildren(revealImgContainer);
+
+        var img = document.createElement("img");
+        img.src = dino.realImg;
+        img.alt = dino.name;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "cover";
+        img.style.borderRadius = "16px";
+        img.onerror = function() {
+            clearChildren(revealImgContainer);
+            var fallback = document.createElement("div");
+            fallback.className = "reveal-img-fallback";
+            fallback.style.background = dino.gradient;
+            fallback.textContent = dino.emoji;
+            revealImgContainer.appendChild(fallback);
+        };
+        revealImgContainer.appendChild(img);
+
+        revealName.textContent = dino.name + "!";
+        revealFact.textContent = dino.fact;
+
+        if (currentDig >= 5) {
+            nextBtn.textContent = "See Your Dinos! \u{1F3C6}";
+        } else {
+            nextBtn.textContent = "Next Dig \u26CF\uFE0F";
+        }
+
+        revealScreen.classList.remove("hidden");
+    }
+
+    function startDig() {
+        buildProgressBar();
+        var dino = dinoOrder[currentDig];
+        digLabel.textContent = "Dig " + (currentDig + 1) + " of 6: " + dino.name + " " + dino.emoji;
+        digLabel.classList.add("active");
+        progressBar.classList.add("active");
+        gameArea.classList.add("active");
+        hintText.classList.add("active");
+        digPercent.classList.add("active");
+        setupFossilImage(dino);
+        buildGrid();
+    }
+
+    function nextDig() {
+        revealScreen.classList.add("hidden");
+        currentDig++;
+        if (currentDig >= 6) {
+            showCompletion();
+        } else {
+            startDig();
+        }
+    }
+
+    function showCompletion() {
+        gameArea.classList.remove("active");
+        progressBar.classList.remove("active");
+        digLabel.classList.remove("active");
+        hintText.classList.remove("active");
+        digPercent.classList.remove("active");
+
+        clearChildren(completionDinos);
+        for (var i = 0; i < dinoOrder.length; i++) {
+            completionDinos.appendChild(document.createTextNode(dinoOrder[i].emoji));
+        }
+        completeScreen.classList.remove("hidden");
+        spawnParticles();
+    }
+
+    function startGame() {
+        currentDig = 0;
+        dinoOrder = DINOS.slice();
+        startScreen.classList.add("hidden");
+        completeScreen.classList.add("hidden");
+        startDig();
+    }
+
+    function restart() {
+        completeScreen.classList.add("hidden");
+        currentDig = 0;
+        dinoOrder = DINOS.slice();
+        startDig();
+    }
+
+    playBtn.addEventListener("click", startGame);
+    nextBtn.addEventListener("click", nextDig);
+    restartBtn.addEventListener("click", restart);
+
+})();
+</script>
+</body>
+</html>

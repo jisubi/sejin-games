@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocean Race!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #0077be 0%, #004e8c 50%, #003366 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Bubbles background */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            animation: rise linear infinite;
+        }
+
+        @keyframes rise {
+            0% { transform: translateY(0) translateX(0); opacity: 0.5; }
+            50% { transform: translateY(-50vh) translateX(20px); opacity: 0.8; }
+            100% { transform: translateY(-100vh) translateX(-10px); opacity: 0; }
+        }
+
+        /* Track and lanes - vertical ocean */
+        #track {
+            position: absolute;
+            top: 10%;
+            bottom: 10%;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .lane {
+            position: relative;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            border-bottom: 3px dashed rgba(255, 255, 255, 0.2);
+        }
+
+        .lane:last-child { border-bottom: none; }
+
+        .lane.player-lane {
+            background: rgba(255, 215, 0, 0.15);
+        }
+
+        .swimmer {
+            position: absolute;
+            font-size: 70px;
+            transition: left 0.5s ease-out;
+            filter: drop-shadow(3px 3px 3px rgba(0,0,0,0.4));
+        }
+
+        .swimmer.player {
+            font-size: 90px;
+        }
+
+        /* Player indicator */
+        .player-arrow {
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 40px;
+            animation: bounce 0.5s ease-in-out infinite alternate;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+        }
+
+        .player-label {
+            position: absolute;
+            top: -85px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #FFD700;
+            color: #333;
+            padding: 5px 15px;
+            border-radius: 10px;
+            font-size: 1rem;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+
+        @keyframes bounce {
+            from { transform: translateX(-50%) translateY(0); }
+            to { transform: translateX(-50%) translateY(10px); }
+        }
+
+        /* Progress indicators */
+        .progress-bar {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-family: 'Fredoka One', cursive;
+            border: 4px solid #333;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Finish line */
+        #finish-line {
+            position: absolute;
+            right: 90px;
+            top: 0;
+            bottom: 0;
+            width: 25px;
+            background: repeating-linear-gradient(
+                0deg,
+                white 0px,
+                white 20px,
+                #333 20px,
+                #333 40px
+            );
+            box-shadow: 0 0 20px rgba(255,255,255,0.5);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 50px;
+            border-radius: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            font-size: 1.8rem;
+            border: 5px solid #FFD700;
+            z-index: 10;
+            text-align: center;
+            color: #333;
+        }
+
+        /* Question popup */
+        #question-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 50px 80px;
+            border-radius: 40px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            z-index: 100;
+            border: 8px solid #00bcd4;
+        }
+
+        #question-popup.hidden { display: none; }
+
+        #question-text {
+            font-size: 2.2rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        #question-char {
+            font-size: 10rem;
+            color: #0077be;
+            text-shadow: 5px 5px #00bcd4;
+            margin: 20px 0;
+            animation: pulse 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+
+        #timer-bar {
+            width: 100%;
+            height: 25px;
+            background: #ddd;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 25px;
+        }
+
+        #timer-fill {
+            height: 100%;
+            background: linear-gradient(to right, #00bcd4, #4dd0e1);
+            transition: width 0.1s linear;
+        }
+
+        #timer-fill.warning { background: linear-gradient(to right, #FF9800, #FFC107); }
+        #timer-fill.danger { background: linear-gradient(to right, #f44336, #FF5722); }
+
+        /* Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 30, 60, 0.92);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .overlay.hidden { display: none; }
+
+        h1 {
+            font-size: 5rem;
+            color: #00bcd4;
+            text-shadow: 4px 4px #0077be;
+            margin-bottom: 20px;
+        }
+
+        .subtitle {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        .swimmers-preview {
+            font-size: 5rem;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 25px 70px;
+            font-size: 2.8rem;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #00bcd4, #0097a7);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 8px #00796b;
+            transition: all 0.1s;
+            margin: 10px;
+        }
+
+        button:hover { background: linear-gradient(to bottom, #26c6da, #00bcd4); }
+        button:active {
+            box-shadow: 0 4px #00796b;
+            transform: translateY(4px);
+        }
+
+        .home-btn {
+            padding: 18px 40px;
+            font-size: 1.8rem;
+            background: linear-gradient(to bottom, #78909c, #607d8b);
+            box-shadow: 0 6px #455a64;
+        }
+
+        /* Character selection */
+        .character-select {
+            display: flex;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .character-option {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 25px;
+            padding: 20px 25px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 5px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+        }
+
+        .character-option:hover {
+            transform: scale(1.1);
+            border-color: #FFD700;
+        }
+
+        .character-option.selected {
+            border-color: #FFD700;
+            background: #FFD700;
+            transform: scale(1.15);
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+        }
+
+        .char-emoji {
+            font-size: 4rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .char-name {
+            font-size: 1.2rem;
+            color: #333;
+        }
+
+        .character-option.selected .char-name {
+            font-weight: bold;
+        }
+
+        .key {
+            display: inline-block;
+            background: #0077be;
+            color: white;
+            padding: 10px 25px;
+            border-radius: 12px;
+            margin: 0 5px;
+            font-size: 2rem;
+        }
+
+        /* Result feedback */
+        #feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 8rem;
+            z-index: 150;
+            animation: popIn 0.5s ease-out forwards;
+        }
+
+        #feedback.hidden { display: none; }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.3); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* Winner display */
+        #winner-text {
+            font-size: 2.5rem;
+            margin: 20px 0;
+        }
+
+        .winner-swimmer {
+            font-size: 10rem;
+            margin: 20px 0;
+            animation: swim 1s ease-in-out infinite;
+        }
+
+        @keyframes swim {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(10px) rotate(5deg); }
+            75% { transform: translateX(-10px) rotate(-5deg); }
+        }
+
+        /* Seaweed decoration */
+        .seaweed {
+            position: absolute;
+            bottom: 0;
+            font-size: 60px;
+            animation: sway 3s ease-in-out infinite;
+        }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Bubbles -->
+        <div id="bubbles"></div>
+
+        <!-- Seaweed decorations -->
+        <div id="seaweed"></div>
+
+        <div id="hud">
+            <div>Round: <span id="round">1</span> / 10</div>
+        </div>
+
+        <div id="track">
+            <div id="finish-line"></div>
+            <div class="lane player-lane" id="lane-0">
+                <div class="swimmer player" id="swimmer-0">
+                    <div class="player-label">YOU!</div>
+                    <div class="player-arrow">👇</div>
+                    🐠
+                </div>
+                <span class="progress-bar" id="progress-0">0</span>
+            </div>
+            <div class="lane" id="lane-1">
+                <span class="swimmer" id="swimmer-1">🦈</span>
+                <span class="progress-bar" id="progress-1">0</span>
+            </div>
+            <div class="lane" id="lane-2">
+                <span class="swimmer" id="swimmer-2">🐙</span>
+                <span class="progress-bar" id="progress-2">0</span>
+            </div>
+            <div class="lane" id="lane-3">
+                <span class="swimmer" id="swimmer-3">🐡</span>
+                <span class="progress-bar" id="progress-3">0</span>
+            </div>
+        </div>
+
+        <div id="question-popup" class="hidden">
+            <div id="question-text">Press this key!</div>
+            <div id="question-char">A</div>
+            <div id="timer-bar">
+                <div id="timer-fill"></div>
+            </div>
+        </div>
+
+        <div id="feedback" class="hidden"></div>
+
+        <div id="start-screen" class="overlay">
+            <h1>Ocean Race!</h1>
+            <div class="subtitle">Pick your swimmer!</div>
+            <div class="character-select">
+                <div class="character-option selected" onclick="selectCharacter(0)">
+                    <span class="char-emoji">🐠</span>
+                    <span class="char-name">Fish</span>
+                </div>
+                <div class="character-option" onclick="selectCharacter(1)">
+                    <span class="char-emoji">🦈</span>
+                    <span class="char-name">Shark</span>
+                </div>
+                <div class="character-option" onclick="selectCharacter(2)">
+                    <span class="char-emoji">🐙</span>
+                    <span class="char-name">Octopus</span>
+                </div>
+                <div class="character-option" onclick="selectCharacter(3)">
+                    <span class="char-emoji">🐡</span>
+                    <span class="char-name">Puffer</span>
+                </div>
+            </div>
+            <div class="subtitle" style="margin-top: 20px; font-size: 1.5rem;">
+                Press the letter or number to swim!<br>
+                First to 10 wins!
+            </div>
+            <button onclick="startGame()">SWIM!</button>
+            <button class="home-btn" onclick="goHome()">HOME</button>
+        </div>
+
+        <div id="win-screen" class="overlay hidden">
+            <h1 id="win-title">WINNER!</h1>
+            <div class="winner-swimmer" id="winner-swimmer">🐠</div>
+            <div id="winner-text" class="subtitle"></div>
+            <button onclick="startGame()">RACE AGAIN!</button>
+            <button class="home-btn" onclick="goHome()">HOME</button>
+        </div>
+    </div>
+
+    <script>
+        // Characters to use (easy ones for kids)
+        const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+        // Game state
+        let scores = [0, 0, 0, 0];
+        let round = 0;
+        let currentChar = '';
+        let timerInterval = null;
+        let timeLeft = 10;
+        let waitingForInput = false;
+        let gameActive = false;
+
+        const allSwimmers = [
+            { emoji: '🐠', name: 'Fish' },
+            { emoji: '🦈', name: 'Shark' },
+            { emoji: '🐙', name: 'Octopus' },
+            { emoji: '🐡', name: 'Pufferfish' }
+        ];
+        let selectedCharacter = 0;
+        let swimmerOrder = [0, 1, 2, 3]; // Player's character index first, then others
+
+        function selectCharacter(index) {
+            selectedCharacter = index;
+            // Update UI
+            const options = document.querySelectorAll('.character-option');
+            options.forEach(function(opt, i) {
+                if (i === index) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+        }
+
+        function setupLanes() {
+            // Build order: selected character first, then others
+            swimmerOrder = [selectedCharacter];
+            for (let i = 0; i < 4; i++) {
+                if (i !== selectedCharacter) {
+                    swimmerOrder.push(i);
+                }
+            }
+
+            // Update lane contents
+            for (let laneIdx = 0; laneIdx < 4; laneIdx++) {
+                const swimmerIdx = swimmerOrder[laneIdx];
+                const lane = document.getElementById('lane-' + laneIdx);
+                const swimmer = document.getElementById('swimmer-' + laneIdx);
+
+                if (laneIdx === 0) {
+                    // Player lane
+                    lane.classList.add('player-lane');
+                    swimmer.className = 'swimmer player';
+                    swimmer.innerHTML = '<div class="player-label">YOU!</div><div class="player-arrow">👇</div>' + allSwimmers[swimmerIdx].emoji;
+                } else {
+                    lane.classList.remove('player-lane');
+                    swimmer.className = 'swimmer';
+                    swimmer.textContent = allSwimmers[swimmerIdx].emoji;
+                }
+            }
+        }
+
+        // Create bubbles
+        function createBubbles() {
+            const container = document.getElementById('bubbles');
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
+            for (let i = 0; i < 25; i++) {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                bubble.style.left = Math.random() * 100 + 'vw';
+                bubble.style.bottom = '-50px';
+                bubble.style.width = (10 + Math.random() * 30) + 'px';
+                bubble.style.height = bubble.style.width;
+                bubble.style.animationDuration = (5 + Math.random() * 10) + 's';
+                bubble.style.animationDelay = Math.random() * 5 + 's';
+                container.appendChild(bubble);
+            }
+        }
+
+        // Create seaweed
+        function createSeaweed() {
+            const container = document.getElementById('seaweed');
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
+            const seaweeds = ['🌿', '🌱'];
+            for (let i = 0; i < 8; i++) {
+                const sw = document.createElement('div');
+                sw.className = 'seaweed';
+                sw.textContent = seaweeds[Math.floor(Math.random() * seaweeds.length)];
+                sw.style.left = (i * 12 + Math.random() * 5) + '%';
+                sw.style.animationDelay = Math.random() * 2 + 's';
+                sw.style.opacity = '0.6';
+                container.appendChild(sw);
+            }
+        }
+
+        function goHome() {
+            window.location.href = 'games.html';
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('win-screen').classList.add('hidden');
+
+            // Setup lanes based on character selection
+            setupLanes();
+
+            // Reset scores
+            scores = [0, 0, 0, 0];
+            round = 0;
+            gameActive = true;
+
+            // Reset swimmer positions
+            for (let i = 0; i < 4; i++) {
+                updateSwimmerPosition(i);
+                document.getElementById('progress-' + i).textContent = '0';
+            }
+
+            // Start first round after brief delay
+            setTimeout(nextRound, 1000);
+        }
+
+        function updateSwimmerPosition(swimmerIndex) {
+            const swimmer = document.getElementById('swimmer-' + swimmerIndex);
+            const progress = scores[swimmerIndex] / 10;
+            const startPos = 5;
+            const endPos = 70; // percentage, leaving room for finish line
+            const pos = startPos + (endPos - startPos) * progress;
+            swimmer.style.left = pos + '%';
+            document.getElementById('progress-' + swimmerIndex).textContent = scores[swimmerIndex];
+        }
+
+        function nextRound() {
+            if (!gameActive) return;
+
+            round++;
+            document.getElementById('round').textContent = round;
+
+            // Pick random character
+            currentChar = CHARS[Math.floor(Math.random() * CHARS.length)];
+            document.getElementById('question-char').textContent = currentChar;
+
+            // Show question
+            const popup = document.getElementById('question-popup');
+            popup.classList.remove('hidden');
+
+            // Start timer
+            timeLeft = 10;
+            updateTimerBar();
+            waitingForInput = true;
+
+            timerInterval = setInterval(function() {
+                timeLeft -= 0.1;
+                updateTimerBar();
+
+                if (timeLeft <= 0) {
+                    handleTimeout();
+                }
+            }, 100);
+        }
+
+        function updateTimerBar() {
+            const fill = document.getElementById('timer-fill');
+            const percent = (timeLeft / 10) * 100;
+            fill.style.width = percent + '%';
+
+            fill.classList.remove('warning', 'danger');
+            if (timeLeft <= 3) {
+                fill.classList.add('danger');
+            } else if (timeLeft <= 5) {
+                fill.classList.add('warning');
+            }
+        }
+
+        function handleTimeout() {
+            clearInterval(timerInterval);
+            waitingForInput = false;
+            document.getElementById('question-popup').classList.add('hidden');
+
+            // Player didn't answer - show wrong
+            showFeedback('😢');
+
+            // AI swimmers get their chance (50% success)
+            for (let i = 1; i < 4; i++) {
+                if (Math.random() < 0.5) {
+                    scores[i]++;
+                    updateSwimmerPosition(i);
+                }
+            }
+
+            checkWinOrContinue();
+        }
+
+        function handleCorrectAnswer() {
+            clearInterval(timerInterval);
+            waitingForInput = false;
+            document.getElementById('question-popup').classList.add('hidden');
+
+            // Player scored!
+            scores[0]++;
+            updateSwimmerPosition(0);
+            showFeedback('⭐');
+
+            // AI swimmers get their chance (50% success)
+            for (let i = 1; i < 4; i++) {
+                if (Math.random() < 0.5) {
+                    scores[i]++;
+                    updateSwimmerPosition(i);
+                }
+            }
+
+            checkWinOrContinue();
+        }
+
+        function handleWrongAnswer() {
+            // Show wobble effect but let them keep trying
+            const charDisplay = document.getElementById('question-char');
+            charDisplay.style.color = '#FF0000';
+            setTimeout(function() {
+                charDisplay.style.color = '#0077be';
+            }, 200);
+        }
+
+        function showFeedback(emoji) {
+            const feedback = document.getElementById('feedback');
+            feedback.textContent = emoji;
+            feedback.classList.remove('hidden');
+
+            setTimeout(function() {
+                feedback.classList.add('hidden');
+            }, 800);
+        }
+
+        function checkWinOrContinue() {
+            // Check for winner
+            for (let i = 0; i < 4; i++) {
+                if (scores[i] >= 10) {
+                    endGame(i);
+                    return;
+                }
+            }
+
+            // Continue to next round
+            setTimeout(nextRound, 1200);
+        }
+
+        function endGame(winnerLaneIndex) {
+            gameActive = false;
+
+            const winScreen = document.getElementById('win-screen');
+            const winTitle = document.getElementById('win-title');
+            const winnerSwimmer = document.getElementById('winner-swimmer');
+            const winnerText = document.getElementById('winner-text');
+
+            // Get the actual swimmer that won based on lane order
+            const winnerCharIndex = swimmerOrder[winnerLaneIndex];
+            winnerSwimmer.textContent = allSwimmers[winnerCharIndex].emoji;
+
+            if (winnerLaneIndex === 0) {
+                winTitle.textContent = 'YOU WIN!';
+                winTitle.style.color = '#FFD700';
+                winnerText.textContent = 'AMAZING JOB! 🎉';
+            } else {
+                winTitle.textContent = 'RACE OVER!';
+                winTitle.style.color = '#00bcd4';
+                winnerText.textContent = allSwimmers[winnerCharIndex].name + ' won! You got ' + scores[0] + ' right!';
+            }
+
+            // Celebrate if player won
+            if (winnerLaneIndex === 0) {
+                for (let i = 0; i < 40; i++) {
+                    createConfetti();
+                }
+            }
+
+            winScreen.classList.remove('hidden');
+        }
+
+        function createConfetti() {
+            const confetti = document.createElement('div');
+            const emojis = ['⭐', '🐚', '🌊', '✨', '💙'];
+            confetti.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            confetti.style.cssText = 'position: fixed; font-size: ' + (20 + Math.random() * 30) + 'px; top: -50px; left: ' + (Math.random() * 100) + 'vw; z-index: 300; animation: confettiFall ' + (2 + Math.random() * 2) + 's linear forwards;';
+            document.body.appendChild(confetti);
+            setTimeout(function() { confetti.remove(); }, 4000);
+        }
+
+        // Add confetti animation
+        const style = document.createElement('style');
+        style.textContent = '@keyframes confettiFall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }';
+        document.head.appendChild(style);
+
+        // Keyboard input
+        document.addEventListener('keydown', function(e) {
+            if (!waitingForInput) return;
+
+            const key = e.key.toUpperCase();
+
+            if (key === currentChar) {
+                handleCorrectAnswer();
+            } else if (CHARS.includes(key)) {
+                handleWrongAnswer();
+            }
+        });
+
+        // Touch/click support - show on-screen keyboard hint
+        document.getElementById('question-popup').addEventListener('click', function() {
+            // For tablets, prompt keyboard
+            const input = document.createElement('input');
+            input.style.cssText = 'position:fixed;top:-100px;';
+            input.setAttribute('autocapitalize', 'characters');
+            document.body.appendChild(input);
+            input.focus();
+
+            input.addEventListener('input', function(e) {
+                const key = e.data ? e.data.toUpperCase() : '';
+                if (key === currentChar) {
+                    handleCorrectAnswer();
+                } else if (key && CHARS.includes(key)) {
+                    handleWrongAnswer();
+                }
+                input.value = '';
+            });
+
+            setTimeout(function() { input.remove(); }, 30000);
+        });
+
+        // Initialize decorations
+        createBubbles();
+        createSeaweed();
+    </script>
+</body>
+</html>

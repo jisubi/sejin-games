@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Car Run!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 900px;
+            max-height: 600px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        #hud {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 8px 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-size: 1.4rem;
+            border: 4px solid #FFD700;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.2s;
+        }
+        #hud .streak-badge {
+            background: #FF6B35;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+        #hud .streak-badge.hot {
+            background: #f44336;
+            animation: hotPulse 0.5s ease infinite;
+        }
+        @keyframes hotPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Progress bar */
+        #progress-wrap {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            max-width: 400px;
+            height: 18px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            z-index: 10;
+            border: 2px solid rgba(255,255,255,0.4);
+            overflow: visible;
+        }
+        #progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A, #FFD700);
+            border-radius: 8px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        #progress-car {
+            position: absolute;
+            top: -10px;
+            font-size: 1.2rem;
+            transition: left 0.3s ease;
+            left: 0;
+        }
+        #progress-flag {
+            position: absolute;
+            top: -10px;
+            right: -6px;
+            font-size: 1.2rem;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 20px;
+            z-index: 100;
+        }
+        .overlay.hidden { display: none; }
+
+        h1 {
+            font-size: 3.5rem;
+            color: #FFD700;
+            text-shadow: 3px 3px #333;
+            margin-bottom: 20px;
+        }
+
+        .instructions {
+            color: white;
+            font-size: 1.3rem;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 2;
+        }
+
+        button {
+            padding: 20px 50px;
+            font-size: 2rem;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 8px #2d6a2f;
+            transition: all 0.1s;
+        }
+        button:hover { background: linear-gradient(to bottom, #5CBF60, #4CAF50); }
+        button:active {
+            box-shadow: 0 4px #2d6a2f;
+            transform: translateY(4px);
+        }
+
+        .key {
+            display: inline-block;
+            background: #333;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 8px;
+            margin: 0 5px;
+        }
+
+        /* End screen */
+        .end-stats {
+            color: white;
+            font-size: 1.3rem;
+            margin: 16px 0;
+            text-align: center;
+            line-height: 2;
+        }
+        .end-stats .big { font-size: 2.5rem; color: #FFD700; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="hud" style="display:none;">
+            <span>&#x2B50; <span id="coin-count">0</span></span>
+            <span class="streak-badge" id="streak-badge" style="display:none;">&#x1F525; <span id="streak-count">0</span></span>
+        </div>
+
+        <div id="progress-wrap" style="display:none;">
+            <div id="progress-fill"></div>
+            <div id="progress-car">&#x1F3CE;&#xFE0F;</div>
+            <div id="progress-flag">&#x1F3C1;</div>
+        </div>
+
+        <canvas id="game"></canvas>
+
+        <!-- START -->
+        <div id="start-screen" class="overlay">
+            <h1>Race Car Run!</h1>
+            <div class="instructions">
+                <span class="key">UP</span> Jump over cones<br>
+                <span class="key">DOWN</span> Duck under birds<br>
+                <span class="key">DOWN</span> while jumping = fast drop!<br>
+                Collect 5 stars in a row for a BOOST!
+            </div>
+            <button onclick="startGame()">PLAY</button>
+            <button style="background: linear-gradient(to bottom, #2196F3, #1976D2); box-shadow: 0 8px #1565C0; margin-top: 15px; font-size:1.3rem; padding:12px 30px;" onclick="location.href='games.html'">HOME</button>
+        </div>
+
+        <!-- END -->
+        <div id="end-screen" class="overlay hidden">
+            <h1 id="end-title">You Finished!</h1>
+            <div class="end-stats" id="end-stats"></div>
+            <button onclick="startGame()">RACE AGAIN</button>
+            <button style="background: linear-gradient(to bottom, #2196F3, #1976D2); box-shadow: 0 8px #1565C0; margin-top: 15px; font-size:1.3rem; padding:12px 30px;" onclick="location.href='games.html'">HOME</button>
+        </div>
+    </div>
+
+    <script>
+        var canvas = document.getElementById('game');
+        var ctx = canvas.getContext('2d');
+
+        canvas.width = 900;
+        canvas.height = 600;
+
+        // === CONFIG ===
+        var BASE_SPEED = 2.2;
+        var BOOST_SPEED = 4.0;
+        var STUTTER_SPEED = 0.6;
+        var JUMP_FORCE = -7;
+        var GRAVITY = 0.15;          // very low gravity = moon jump float
+        var PEAK_GRAVITY = 0.06;     // even less gravity near the peak for hang time
+        var FAST_FALL_GRAVITY = 1.8; // DOWN key slams you back down fast
+        var TOTAL_COINS = 30;
+        var RACE_LENGTH = 18000;
+        var STREAK_FOR_BOOST = 5;
+        var BOOST_DURATION = 90;
+        var STUTTER_DURATION = 60;
+        var FINISH_LINE_WORLD_X = RACE_LENGTH; // world position of finish line
+        var raceFinished = false;
+        var finishAnimFrames = 0;
+
+        // === STATE ===
+        var gameRunning = false;
+        var coins = 0;
+        var frameCount = 0;
+        var distance = 0;
+        var currentSpeed = BASE_SPEED;
+        var coinStreak = 0;
+        var boostTimer = 0;
+        var stutterTimer = 0;
+        var obstacles = [];
+        var coinObjects = [];
+        var clouds = [];
+        var groundOffset = 0;
+        var obstacleHits = 0;
+        var boostCount = 0;
+        var raceTime = 0;
+        var scheduledCoins = [];
+        var scheduledObstacles = [];
+        var nextCoinIdx = 0;
+        var nextObsIdx = 0;
+
+        var car = {
+            x: 150, y: 400, width: 80, height: 60,
+            groundY: 400, velocityY: 0, jumping: false, ducking: false
+        };
+
+        function randBetween(a, b) {
+            return a + Math.random() * (b - a);
+        }
+
+        // === PRE-SCHEDULE RACE ===
+        function scheduleRace() {
+            scheduledCoins = [];
+            scheduledObstacles = [];
+
+            // spread coins with jitter
+            var coinSpacing = RACE_LENGTH / TOTAL_COINS;
+            for (var i = 0; i < TOTAL_COINS; i++) {
+                var basePos = coinSpacing * (i + 0.5);
+                var jitter = randBetween(-coinSpacing * 0.25, coinSpacing * 0.25);
+                var heights = [360, 380, 400];
+                scheduledCoins.push({
+                    dist: basePos + jitter,
+                    y: heights[Math.floor(Math.random() * heights.length)]
+                });
+            }
+            scheduledCoins.sort(function(a, b) { return a.dist - b.dist; });
+
+            // obstacles: sporadic with big gaps
+            var obsPos = randBetween(400, 700);
+            while (obsPos < RACE_LENGTH - 200) {
+                var type = Math.random() > 0.5 ? 'cone' : 'bird';
+                scheduledObstacles.push({ dist: obsPos, type: type });
+                obsPos += randBetween(500, 900);
+            }
+
+            // nudge coins that are too close to obstacles
+            scheduledCoins.forEach(function(coin) {
+                scheduledObstacles.forEach(function(obs) {
+                    if (Math.abs(coin.dist - obs.dist) < 150) {
+                        // push coin 200px ahead of the obstacle
+                        coin.dist = obs.dist + 200;
+                    }
+                });
+            });
+            scheduledCoins.sort(function(a, b) { return a.dist - b.dist; });
+
+            nextCoinIdx = 0;
+            nextObsIdx = 0;
+        }
+
+        function initClouds() {
+            clouds = [];
+            for (var i = 0; i < 5; i++) {
+                clouds.push({
+                    x: Math.random() * canvas.width,
+                    y: 50 + Math.random() * 100,
+                    size: 30 + Math.random() * 40
+                });
+            }
+        }
+
+        // === DRAWING ===
+        function drawBackground() {
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, 350);
+
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(750, 80, 50, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'white';
+            clouds.forEach(function(cloud) {
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 0.7, cloud.y - 10, cloud.size * 0.7, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 1.2, cloud.y, cloud.size * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.fillStyle = '#90EE90';
+            ctx.fillRect(0, 450, canvas.width, 150);
+
+            ctx.fillStyle = '#555';
+            ctx.fillRect(0, 430, canvas.width, 80);
+
+            ctx.fillStyle = '#FFD700';
+            for (var i = -1; i < 10; i++) {
+                var x = (i * 120 - groundOffset % 120);
+                ctx.fillRect(x, 465, 60, 8);
+            }
+
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, 510, canvas.width, 90);
+        }
+
+        function drawFinishLine() {
+            // finish line is at world position FINISH_LINE_WORLD_X
+            // screen position: world_x - distance + car.x (car is the camera anchor)
+            var screenX = FINISH_LINE_WORLD_X - distance + car.x;
+            if (screenX > canvas.width + 50 || screenX < -50) return;
+
+            // checkerboard pattern
+            for (var row = 0; row < 8; row++) {
+                for (var col = 0; col < 3; col++) {
+                    ctx.fillStyle = (row + col) % 2 === 0 ? '#000' : '#fff';
+                    ctx.fillRect(screenX + col * 15, 430 + row * 10, 15, 10);
+                }
+            }
+            // flag above
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('\u{1F3C1}', screenX + 22, 415);
+
+            // "FINISH" text
+            ctx.fillStyle = '#FFD700';
+            ctx.font = '20px Fredoka One, sans-serif';
+            ctx.fillText('FINISH', screenX + 22, 395);
+        }
+
+        function drawCar() {
+            var carY = car.ducking ? car.y + 20 : car.y;
+            var carH = car.ducking ? 40 : car.height;
+
+            ctx.save();
+            ctx.font = car.ducking ? '50px Arial' : '70px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            var bounce = Math.sin(frameCount * 0.2) * 2;
+            var drawX = car.x;
+            var drawY = carY + carH / 2 + bounce;
+
+            // stutter wobble
+            if (stutterTimer > 0) {
+                drawX += Math.sin(frameCount * 2) * 4;
+                ctx.globalAlpha = 0.6 + Math.sin(frameCount * 3) * 0.3;
+            }
+
+            // boost glow
+            if (boostTimer > 0) {
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 20;
+            }
+
+            // flip car emoji so it faces right
+            ctx.translate(drawX, drawY);
+            ctx.scale(-1, 1);
+            ctx.fillText('\u{1F3CE}\uFE0F', 0, 0);
+
+            ctx.restore();
+        }
+
+        function drawObstacles() {
+            ctx.font = '50px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            obstacles.forEach(function(obs) {
+                if (obs.type === 'cone') {
+                    ctx.fillText('\u{1F53A}', obs.x, obs.y);
+                } else {
+                    var flap = Math.sin(frameCount * 0.3) * 5;
+                    ctx.fillText('\u{1F426}', obs.x, obs.y + flap);
+                }
+            });
+        }
+
+        function drawCoins() {
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            coinObjects.forEach(function(coin) {
+                if (!coin.collected) {
+                    var spin = Math.sin(frameCount * 0.1) * 0.3 + 1;
+                    ctx.save();
+                    ctx.translate(coin.x, coin.y);
+                    ctx.scale(spin, 1);
+                    ctx.fillText('\u2B50', 0, 0);
+                    ctx.restore();
+                }
+            });
+        }
+
+        function drawBoostEffect() {
+            if (boostTimer <= 0) return;
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+            ctx.lineWidth = 3;
+            for (var i = 0; i < 6; i++) {
+                var ly = 200 + i * 50 + Math.sin(frameCount * 0.5 + i) * 20;
+                var lx = car.x - 60 - Math.random() * 80;
+                ctx.beginPath();
+                ctx.moveTo(lx, ly);
+                ctx.lineTo(lx - 40 - Math.random() * 30, ly);
+                ctx.stroke();
+            }
+        }
+
+        // === UPDATE ===
+        function update() {
+            frameCount++;
+            raceTime++;
+
+            if (stutterTimer > 0) {
+                currentSpeed = STUTTER_SPEED;
+                stutterTimer--;
+            } else if (boostTimer > 0) {
+                currentSpeed = BOOST_SPEED;
+                boostTimer--;
+            } else {
+                currentSpeed = BASE_SPEED;
+            }
+
+            distance += currentSpeed;
+            groundOffset += currentSpeed;
+
+            clouds.forEach(function(cloud) {
+                cloud.x -= currentSpeed * 0.3;
+                if (cloud.x < -100) {
+                    cloud.x = canvas.width + 100;
+                    cloud.y = 50 + Math.random() * 100;
+                }
+            });
+
+            // car physics
+            if (car.jumping) {
+                var grav;
+                if (car.ducking) {
+                    // fast fall when holding DOWN
+                    grav = FAST_FALL_GRAVITY;
+                } else if (Math.abs(car.velocityY) < 2.5) {
+                    // near the peak of the jump = extra floaty hang time
+                    grav = PEAK_GRAVITY;
+                } else {
+                    grav = GRAVITY;
+                }
+                car.velocityY += grav;
+                car.y += car.velocityY;
+                if (car.y >= car.groundY) {
+                    car.y = car.groundY;
+                    car.jumping = false;
+                    car.velocityY = 0;
+                }
+            }
+
+            // spawn scheduled coins
+            while (nextCoinIdx < scheduledCoins.length) {
+                var sc = scheduledCoins[nextCoinIdx];
+                if (sc.dist <= distance + canvas.width) {
+                    coinObjects.push({
+                        x: canvas.width + (sc.dist - distance),
+                        y: sc.y,
+                        width: 40, height: 40,
+                        collected: false, passed: false
+                    });
+                    nextCoinIdx++;
+                } else { break; }
+            }
+
+            // spawn scheduled obstacles
+            while (nextObsIdx < scheduledObstacles.length) {
+                var so = scheduledObstacles[nextObsIdx];
+                if (so.dist <= distance + canvas.width) {
+                    obstacles.push({
+                        x: canvas.width + (so.dist - distance),
+                        y: so.type === 'cone' ? 435 : 320,
+                        type: so.type,
+                        width: 50, height: 50, hit: false
+                    });
+                    nextObsIdx++;
+                } else { break; }
+            }
+
+            // move obstacles
+            obstacles.forEach(function(obs) { obs.x -= currentSpeed; });
+            obstacles = obstacles.filter(function(obs) { return obs.x > -80; });
+
+            // move coins
+            coinObjects.forEach(function(coin) { coin.x -= currentSpeed; });
+
+            // check missed coins
+            coinObjects.forEach(function(coin) {
+                if (!coin.collected && !coin.passed && coin.x < car.x - 60) {
+                    coin.passed = true;
+                    coinStreak = 0;
+                    updateStreakBadge();
+                }
+            });
+            coinObjects = coinObjects.filter(function(coin) { return coin.x > -60 && !coin.collected; });
+
+            // collect coins
+            var carHitbox = getCarHitbox();
+            coinObjects.forEach(function(coin) {
+                if (!coin.collected && checkCollision(carHitbox, coin)) {
+                    coin.collected = true;
+                    coins++;
+                    coinStreak++;
+                    document.getElementById('coin-count').textContent = coins;
+                    celebrateCoin();
+                    updateStreakBadge();
+                    if (coinStreak > 0 && coinStreak % STREAK_FOR_BOOST === 0) {
+                        triggerBoost();
+                    }
+                }
+            });
+
+            // obstacle collisions
+            obstacles.forEach(function(obs) {
+                if (obs.hit) return;
+                // cone: small hitbox near ground; bird: small hitbox in air
+                var obsHitbox = obs.type === 'cone'
+                    ? { x: obs.x - 15, y: obs.y - 15, width: 30, height: 30 }
+                    : { x: obs.x - 18, y: obs.y - 18, width: 36, height: 36 };
+                if (checkCollision(carHitbox, obsHitbox)) {
+                    obs.hit = true;
+                    obs.x = -100;
+                    obstacleHits++;
+                    coinStreak = 0;
+                    updateStreakBadge();
+                    triggerStutter();
+                }
+            });
+
+            updateProgressBar();
+
+            // finish: car must cross the finish line (finish line passes the car)
+            var finishScreenX = FINISH_LINE_WORLD_X - distance + car.x;
+            if (!raceFinished && finishScreenX <= car.x) {
+                raceFinished = true;
+                finishAnimFrames = 0;
+            }
+            if (raceFinished) {
+                finishAnimFrames++;
+                // let the car drive past for a moment, then end
+                if (finishAnimFrames >= 60) {
+                    finishRace();
+                    return;
+                }
+            }
+        }
+
+        function getCarHitbox() {
+            var carY = car.ducking ? car.y + 20 : car.y;
+            var carH = car.ducking ? 40 : car.height;
+            return { x: car.x - 30, y: carY, width: 60, height: carH };
+        }
+
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        function celebrateCoin() {
+            var hud = document.getElementById('hud');
+            hud.style.transform = 'translateX(-50%) scale(1.2)';
+            hud.style.background = '#FFD700';
+            setTimeout(function() {
+                hud.style.transform = 'translateX(-50%) scale(1)';
+                hud.style.background = 'white';
+            }, 200);
+        }
+
+        function triggerBoost() {
+            boostTimer = BOOST_DURATION;
+            stutterTimer = 0;
+            boostCount++;
+        }
+
+        function triggerStutter() {
+            if (boostTimer > 0) return;
+            stutterTimer = STUTTER_DURATION;
+        }
+
+        function updateStreakBadge() {
+            var badge = document.getElementById('streak-badge');
+            var countEl = document.getElementById('streak-count');
+            if (coinStreak >= 2) {
+                badge.style.display = 'inline-block';
+                countEl.textContent = coinStreak;
+                badge.className = coinStreak >= 4 ? 'streak-badge hot' : 'streak-badge';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        function updateProgressBar() {
+            var pct = Math.min(100, (distance / RACE_LENGTH) * 100);
+            document.getElementById('progress-fill').style.width = pct + '%';
+            document.getElementById('progress-car').style.left = Math.min(pct, 95) + '%';
+        }
+
+        // === FINISH ===
+        function finishRace() {
+            gameRunning = false;
+
+            var timeSeconds = (raceTime / 60).toFixed(1);
+
+            var statsEl = document.getElementById('end-stats');
+            statsEl.textContent = '';
+
+            var bigDiv = document.createElement('div');
+            bigDiv.className = 'big';
+            bigDiv.textContent = coins + ' / ' + TOTAL_COINS + ' stars!';
+            statsEl.appendChild(bigDiv);
+
+            var lines = [
+                'Time: ' + timeSeconds + 's',
+                'Obstacles hit: ' + obstacleHits,
+                'Boosts earned: ' + boostCount
+            ];
+            lines.forEach(function(line) {
+                var br = document.createElement('br');
+                statsEl.appendChild(br);
+                statsEl.appendChild(document.createTextNode(line));
+            });
+
+            var titleEl = document.getElementById('end-title');
+            if (coins === TOTAL_COINS && obstacleHits === 0) {
+                titleEl.textContent = '\u{1F31F} PERFECT RACE! \u{1F31F}';
+            } else if (coins >= TOTAL_COINS * 0.8) {
+                titleEl.textContent = '\u{1F3C6} Amazing Race!';
+            } else if (coins >= TOTAL_COINS * 0.5) {
+                titleEl.textContent = '\u{1F3C1} Great Job!';
+            } else {
+                titleEl.textContent = '\u{1F3C1} You Finished!';
+            }
+
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        // === GAME LOOP ===
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            drawFinishLine();
+            drawObstacles();
+            drawCoins();
+            drawBoostEffect();
+            drawCar();
+            update();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // === START ===
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('progress-wrap').style.display = 'block';
+
+            coins = 0; frameCount = 0; distance = 0; raceTime = 0;
+            currentSpeed = BASE_SPEED; coinStreak = 0;
+            boostTimer = 0; stutterTimer = 0;
+            obstacleHits = 0; boostCount = 0;
+            raceFinished = false; finishAnimFrames = 0;
+            obstacles = []; coinObjects = [];
+            car.y = car.groundY; car.jumping = false;
+            car.ducking = false; car.velocityY = 0;
+            groundOffset = 0;
+
+            document.getElementById('coin-count').textContent = '0';
+            document.getElementById('streak-badge').style.display = 'none';
+            updateProgressBar();
+
+            scheduleRace();
+            initClouds();
+            gameRunning = true;
+            gameLoop();
+        }
+
+        // === CONTROLS ===
+        document.addEventListener('keydown', function(e) {
+            if (!gameRunning) return;
+            if (e.key === 'ArrowUp' && !car.jumping) {
+                car.jumping = true;
+                car.velocityY = JUMP_FORCE;
+            }
+            if (e.key === 'ArrowDown') {
+                car.ducking = true;
+                // fast fall if in the air
+                if (car.jumping && car.velocityY < 8) {
+                    car.velocityY += 6;
+                }
+            }
+            if (e.key === 'Escape') {
+                gameRunning = false;
+                document.getElementById('start-screen').classList.remove('hidden');
+                document.getElementById('hud').style.display = 'none';
+                document.getElementById('progress-wrap').style.display = 'none';
+            }
+        });
+
+        document.addEventListener('keyup', function(e) {
+            if (e.key === 'ArrowDown') { car.ducking = false; }
+        });
+
+        var touchStartY = 0;
+        canvas.addEventListener('touchstart', function(e) {
+            touchStartY = e.touches[0].clientY;
+        });
+        canvas.addEventListener('touchend', function(e) {
+            if (!gameRunning) return;
+            var diff = touchStartY - e.changedTouches[0].clientY;
+            if (diff > 30 && !car.jumping) {
+                car.jumping = true;
+                car.velocityY = JUMP_FORCE;
+            } else if (diff < -30) {
+                car.ducking = true;
+                // fast fall if airborne
+                if (car.jumping && car.velocityY < 8) {
+                    car.velocityY += 6;
+                }
+                setTimeout(function() { car.ducking = false; }, 500);
+            }
+        });
+
+        // initial static background
+        initClouds();
+        (function() {
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, 350);
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath(); ctx.arc(750, 80, 50, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#90EE90';
+            ctx.fillRect(0, 450, canvas.width, 150);
+            ctx.fillStyle = '#555';
+            ctx.fillRect(0, 430, canvas.width, 80);
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, 510, canvas.width, 90);
+        })();
+    </script>
+</body>
+</html>

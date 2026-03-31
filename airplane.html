@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky Pilot!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: #000;
+            overflow: hidden;
+            cursor: none;
+        }
+        canvas { display: block; }
+
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.82);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 200; color: white; text-align: center;
+        }
+        .overlay.hidden { display: none; }
+        .overlay h1 { font-size: 3.5rem; color: #FFD700; text-shadow: 3px 3px #333; margin-bottom: 10px; }
+        .overlay .sub { font-size: 1.2rem; color: #ddd; margin-bottom: 24px; max-width: 480px; line-height: 1.6; }
+        .overlay button {
+            padding: 18px 50px; font-size: 2rem; font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #4CAF50, #45a049); color: white;
+            border: none; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 6px #2d6a2f; transition: all 0.1s; margin: 6px;
+        }
+        .overlay button:active { box-shadow: 0 3px #2d6a2f; transform: translateY(3px); }
+        .overlay button.home-btn {
+            background: linear-gradient(to bottom, #2196F3, #1976D2);
+            box-shadow: 0 6px #1565C0; font-size: 1.3rem; padding: 12px 30px;
+        }
+        .end-stats { color: white; font-size: 1.3rem; margin: 16px 0; line-height: 2.2; }
+        .end-stats .big { font-size: 3rem; color: #FFD700; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="overlay" id="start-screen">
+    <h1>Sky Pilot!</h1>
+    <p class="sub">Move your mouse to fly the plane! Grab the green rings and dodge the bombs!</p>
+    <button onclick="startGame()">TAKE OFF!</button>
+    <button class="home-btn" onclick="location.href='games.html'">HOME</button>
+</div>
+
+<div class="overlay hidden" id="end-screen">
+    <h1 id="end-title">Great Flying!</h1>
+    <div class="end-stats" id="end-stats"></div>
+    <button onclick="startGame()">FLY AGAIN!</button>
+    <button class="home-btn" onclick="location.href='games.html'">HOME</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+var canvas = document.getElementById('game');
+var ctx = canvas.getContext('2d');
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// === CONFIG ===
+var GAME_DURATION = 30;        // seconds
+var RING_LIFETIME = 4;         // seconds a ring stays visible
+var BOMB_LIFETIME = 4;         // seconds a bomb stays visible
+var RING_SPAWN_INTERVAL = 2.5; // seconds between ring spawns
+var BOMB_SPAWN_INTERVAL = 4;   // seconds between bomb spawns
+var RING_RADIUS = 50;          // size of ring
+var BOMB_RADIUS = 30;          // size of bomb
+var PLANE_HIT_RADIUS = 35;     // how close plane needs to be
+
+// === STATE ===
+var gameRunning = false;
+var planeX = 0;
+var planeY = 0;
+var mouseX = 0;
+var mouseY = 0;
+var frameCount = 0;
+var gameTimer = 0;
+var ringsCollected = 0;
+var ringsMissed = 0;
+var bombsHit = 0;
+var rings = [];
+var bombs = [];
+var clouds = [];
+var particles = [];
+var nextRingTime = 0;
+var nextBombTime = 0;
+var lastTime = 0;
+var elapsed = 0;
+
+// === CLOUDS (ambient) ===
+function initClouds() {
+    clouds = [];
+    for (var i = 0; i < 12; i++) {
+        clouds.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: 40 + Math.random() * 80,
+            speed: 0.2 + Math.random() * 0.5,
+            opacity: 0.08 + Math.random() * 0.12
+        });
+    }
+}
+
+// === PARTICLES ===
+function spawnParticles(x, y, color, count) {
+    for (var i = 0; i < count; i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = 1 + Math.random() * 4;
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            color: color,
+            size: 3 + Math.random() * 5
+        });
+    }
+}
+
+// === PLANE DRAWING ===
+function drawPlane(cx, cy, bankAngle) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(bankAngle * 0.15);
+
+    var w = 100;
+    var h = 45;
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.beginPath();
+    ctx.ellipse(3, 5, w * 0.45, h * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // wings
+    ctx.fillStyle = '#c0c0c0';
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, h * 0.1);
+    ctx.lineTo(-w * 0.08, -h * 0.1);
+    ctx.lineTo(-w * 0.08, h * 0.15);
+    ctx.lineTo(-w * 0.45, h * 0.22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5, h * 0.1);
+    ctx.lineTo(w * 0.08, -h * 0.1);
+    ctx.lineTo(w * 0.08, h * 0.15);
+    ctx.lineTo(w * 0.45, h * 0.22);
+    ctx.closePath();
+    ctx.fill();
+
+    // wing tips
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(-w * 0.5, h * 0.08, w * 0.05, h * 0.14);
+    ctx.fillRect(w * 0.45, h * 0.08, w * 0.05, h * 0.14);
+
+    // fuselage
+    ctx.fillStyle = '#e8e8e8';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w * 0.08, h * 0.48, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // cockpit
+    ctx.fillStyle = '#3498db';
+    ctx.beginPath();
+    ctx.ellipse(0, -h * 0.28, w * 0.055, h * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // tail
+    ctx.fillStyle = '#2c3e50';
+    ctx.beginPath();
+    ctx.moveTo(0, -h * 0.15);
+    ctx.lineTo(-w * 0.012, h * 0.22);
+    ctx.lineTo(w * 0.012, h * 0.22);
+    ctx.closePath();
+    ctx.fill();
+
+    // horizontal tail
+    ctx.fillStyle = '#bbb';
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.14, h * 0.2);
+    ctx.lineTo(-w * 0.02, h * 0.1);
+    ctx.lineTo(w * 0.02, h * 0.1);
+    ctx.lineTo(w * 0.14, h * 0.2);
+    ctx.closePath();
+    ctx.fill();
+
+    // engines
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.ellipse(-w * 0.22, h * 0.12, w * 0.025, h * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(w * 0.22, h * 0.12, w * 0.025, h * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+// === DRAW RING ===
+function drawRing(ring) {
+    var alpha = 1;
+    // fade in
+    if (ring.age < 0.3) alpha = ring.age / 0.3;
+    // fade out in last second
+    var remaining = ring.lifetime - ring.age;
+    if (remaining < 0.8) alpha = remaining / 0.8;
+    if (alpha <= 0) return;
+
+    var pulse = 1 + Math.sin(frameCount * 0.08) * 0.06;
+    var r = RING_RADIUS * pulse;
+
+    // outer glow
+    ctx.fillStyle = 'rgba(76,175,80,' + (0.12 * alpha) + ')';
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, r * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ring body
+    ctx.strokeStyle = 'rgba(76,175,80,' + alpha + ')';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // inner bright ring
+    ctx.strokeStyle = 'rgba(129,199,132,' + (alpha * 0.8) + ')';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, r * 0.8, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // shimmer fill
+    ctx.fillStyle = 'rgba(76,175,80,' + (0.06 * alpha) + ')';
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, r * 0.75, 0, Math.PI * 2);
+    ctx.fill();
+
+    // timer arc (shows remaining time)
+    var timerPct = remaining / ring.lifetime;
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.4 * alpha) + ')';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, r + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * timerPct);
+    ctx.stroke();
+}
+
+// === DRAW BOMB ===
+function drawBomb(bomb) {
+    var alpha = 1;
+    if (bomb.age < 0.3) alpha = bomb.age / 0.3;
+    var remaining = bomb.lifetime - bomb.age;
+    if (remaining < 0.8) alpha = remaining / 0.8;
+    if (alpha <= 0) return;
+
+    var wobble = Math.sin(frameCount * 0.15) * 3;
+
+    // danger glow
+    ctx.fillStyle = 'rgba(231,76,60,' + (0.1 + Math.sin(frameCount * 0.1) * 0.05) * alpha + ')';
+    ctx.beginPath();
+    ctx.arc(bomb.x, bomb.y + wobble, BOMB_RADIUS * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // bomb body
+    ctx.fillStyle = 'rgba(44,62,80,' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(bomb.x, bomb.y + wobble, BOMB_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    // highlight
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.2 * alpha) + ')';
+    ctx.beginPath();
+    ctx.arc(bomb.x - BOMB_RADIUS * 0.25, bomb.y + wobble - BOMB_RADIUS * 0.25, BOMB_RADIUS * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // fuse
+    ctx.strokeStyle = 'rgba(230,126,34,' + alpha + ')';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(bomb.x, bomb.y + wobble - BOMB_RADIUS);
+    ctx.lineTo(bomb.x + 8, bomb.y + wobble - BOMB_RADIUS - 12);
+    ctx.stroke();
+
+    // spark
+    var sparkSize = 4 + Math.sin(frameCount * 0.3) * 2;
+    ctx.fillStyle = 'rgba(243,156,18,' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(bomb.x + 8, bomb.y + wobble - BOMB_RADIUS - 12, sparkSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    // X warning
+    ctx.fillStyle = 'rgba(231,76,60,' + (alpha * 0.7) + ')';
+    ctx.font = '16px Fredoka One, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2716', bomb.x, bomb.y + wobble + 5);
+}
+
+// === DRAWING ===
+function drawBackground() {
+    // sky gradient
+    var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#1a5276');
+    grad.addColorStop(0.3, '#5dade2');
+    grad.addColorStop(0.6, '#85c1e9');
+    grad.addColorStop(1, '#aed6f1');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // clouds
+    clouds.forEach(function(c) {
+        ctx.fillStyle = 'rgba(255,255,255,' + c.opacity + ')';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2);
+        ctx.arc(c.x + c.size * 0.6, c.y - c.size * 0.2, c.size * 0.7, 0, Math.PI * 2);
+        ctx.arc(c.x - c.size * 0.4, c.y + c.size * 0.1, c.size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+function drawParticles() {
+    particles.forEach(function(p) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+    // time bar
+    var pct = Math.max(0, gameTimer / GAME_DURATION);
+    var barW = Math.min(canvas.width * 0.5, 350);
+    var barH = 20;
+    var barX = (canvas.width - barW) / 2;
+    var barY = 18;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.roundRect(barX - 2, barY - 2, barW + 4, barH + 4, 12);
+    ctx.fill();
+
+    var barColor = pct > 0.3 ? '#4CAF50' : pct > 0.15 ? '#FF9800' : '#f44336';
+    ctx.fillStyle = barColor;
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW * pct, barH, 10);
+    ctx.fill();
+
+    // time text
+    ctx.fillStyle = 'white';
+    ctx.font = '14px Fredoka One, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.ceil(gameTimer) + 's', canvas.width / 2, barY + barH + 20);
+
+    // score - left
+    ctx.textAlign = 'left';
+    ctx.font = '22px Fredoka One, sans-serif';
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillText('\u{1F7E2} ' + ringsCollected, 20, 38);
+
+    // bombs - right
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText('\u{1F4A3} ' + bombsHit, canvas.width - 20, 38);
+}
+
+// === SPAWNING ===
+function spawnRing() {
+    var margin = RING_RADIUS + 20;
+    rings.push({
+        x: margin + Math.random() * (canvas.width - margin * 2),
+        y: margin + 50 + Math.random() * (canvas.height - margin * 2 - 60),
+        age: 0,
+        lifetime: RING_LIFETIME,
+        collected: false
+    });
+}
+
+function spawnBomb() {
+    var margin = BOMB_RADIUS + 20;
+    bombs.push({
+        x: margin + Math.random() * (canvas.width - margin * 2),
+        y: margin + 50 + Math.random() * (canvas.height - margin * 2 - 60),
+        age: 0,
+        lifetime: BOMB_LIFETIME,
+        hit: false
+    });
+}
+
+// === UPDATE ===
+function update(dt) {
+    frameCount++;
+    gameTimer -= dt;
+
+    if (gameTimer <= 0) {
+        finishGame();
+        return;
+    }
+
+    // smooth plane toward mouse
+    planeX += (mouseX - planeX) * 0.1;
+    planeY += (mouseY - planeY) * 0.1;
+
+    // clamp plane to screen
+    planeX = Math.max(50, Math.min(canvas.width - 50, planeX));
+    planeY = Math.max(50, Math.min(canvas.height - 50, planeY));
+
+    // move clouds
+    clouds.forEach(function(c) {
+        c.x -= c.speed;
+        if (c.x < -c.size * 2) {
+            c.x = canvas.width + c.size;
+            c.y = Math.random() * canvas.height;
+        }
+    });
+
+    // spawn rings
+    nextRingTime -= dt;
+    if (nextRingTime <= 0) {
+        spawnRing();
+        nextRingTime = RING_SPAWN_INTERVAL + (Math.random() - 0.5) * 1;
+    }
+
+    // spawn bombs
+    nextBombTime -= dt;
+    if (nextBombTime <= 0) {
+        spawnBomb();
+        nextBombTime = BOMB_SPAWN_INTERVAL + (Math.random() - 0.5) * 1.5;
+    }
+
+    // age and check rings
+    rings.forEach(function(ring) {
+        ring.age += dt;
+    });
+    // check ring collection
+    rings.forEach(function(ring) {
+        if (ring.collected) return;
+        if (ring.age >= ring.lifetime) {
+            ring.collected = true;
+            ringsMissed++;
+            return;
+        }
+        var dx = planeX - ring.x;
+        var dy = planeY - ring.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < RING_RADIUS + PLANE_HIT_RADIUS) {
+            ring.collected = true;
+            ringsCollected++;
+            spawnParticles(ring.x, ring.y, '#4CAF50', 15);
+        }
+    });
+    rings = rings.filter(function(r) { return !r.collected; });
+
+    // age and check bombs
+    bombs.forEach(function(bomb) {
+        bomb.age += dt;
+    });
+    bombs.forEach(function(bomb) {
+        if (bomb.hit) return;
+        if (bomb.age >= bomb.lifetime) {
+            bomb.hit = true;
+            return;
+        }
+        var dx = planeX - bomb.x;
+        var dy = planeY - bomb.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < BOMB_RADIUS + PLANE_HIT_RADIUS) {
+            bomb.hit = true;
+            bombsHit++;
+            spawnParticles(bomb.x, bomb.y, '#e74c3c', 20);
+        }
+    });
+    bombs = bombs.filter(function(b) { return !b.hit; });
+
+    // update particles
+    particles.forEach(function(p) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= dt * 1.5;
+    });
+    particles = particles.filter(function(p) { return p.life > 0; });
+}
+
+// === GAME LOOP ===
+function gameLoop(timestamp) {
+    if (!gameRunning) return;
+
+    var dt = lastTime ? (timestamp - lastTime) / 1000 : 0.016;
+    dt = Math.min(dt, 0.05); // cap delta
+    lastTime = timestamp;
+
+    update(dt);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBackground();
+
+    rings.forEach(function(r) { drawRing(r); });
+    bombs.forEach(function(b) { drawBomb(b); });
+    drawParticles();
+
+    var bankAngle = (mouseX - planeX) * 0.15;
+    drawPlane(planeX, planeY, bankAngle);
+
+    drawHUD();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// === FINISH ===
+function finishGame() {
+    gameRunning = false;
+    document.body.style.cursor = 'default';
+
+    var totalRings = ringsCollected + ringsMissed;
+
+    var statsEl = document.getElementById('end-stats');
+    statsEl.textContent = '';
+
+    var bigDiv = document.createElement('div');
+    bigDiv.className = 'big';
+    bigDiv.textContent = ringsCollected + ' Rings Collected!';
+    statsEl.appendChild(bigDiv);
+
+    var lines = [
+        '\u{1F7E2} Rings grabbed: ' + ringsCollected,
+        '\u26AA Rings missed: ' + ringsMissed,
+        '\u{1F4A3} Bombs hit: ' + bombsHit,
+    ];
+    lines.forEach(function(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        statsEl.appendChild(div);
+    });
+
+    var titleEl = document.getElementById('end-title');
+    if (ringsCollected >= 10 && bombsHit === 0) {
+        titleEl.textContent = '\u{1F31F} PERFECT FLIGHT! \u{1F31F}';
+    } else if (ringsCollected >= 8) {
+        titleEl.textContent = '\u2708\uFE0F Amazing Pilot!';
+    } else if (ringsCollected >= 5) {
+        titleEl.textContent = '\u{1F3C6} Great Flying!';
+    } else {
+        titleEl.textContent = '\u2708\uFE0F You Landed!';
+    }
+
+    document.getElementById('end-screen').classList.remove('hidden');
+}
+
+// === START ===
+function startGame() {
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('end-screen').classList.add('hidden');
+    document.body.style.cursor = 'none';
+
+    planeX = canvas.width / 2;
+    planeY = canvas.height / 2;
+    mouseX = canvas.width / 2;
+    mouseY = canvas.height / 2;
+    frameCount = 0;
+    gameTimer = GAME_DURATION;
+    ringsCollected = 0;
+    ringsMissed = 0;
+    bombsHit = 0;
+    rings = [];
+    bombs = [];
+    particles = [];
+    nextRingTime = 0.5; // first ring quickly
+    nextBombTime = 3;   // first bomb after a few seconds
+    lastTime = 0;
+
+    initClouds();
+    gameRunning = true;
+    requestAnimationFrame(gameLoop);
+}
+
+// === INPUT ===
+canvas.addEventListener('mousemove', function(e) {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+});
+canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    mouseX = e.touches[0].clientX;
+    mouseY = e.touches[0].clientY;
+}, { passive: false });
+canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    mouseX = e.touches[0].clientX;
+    mouseY = e.touches[0].clientY;
+}, { passive: false });
+
+// initial background
+resize();
+(function() {
+    var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#1a5276');
+    grad.addColorStop(0.3, '#5dade2');
+    grad.addColorStop(0.6, '#85c1e9');
+    grad.addColorStop(1, '#aed6f1');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+})();
+</script>
+</body>
+</html>

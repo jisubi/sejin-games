@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feed the Animals!</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka One', cursive;
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 50%, #ffd89b 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    color: #e74c3c;
+    text-shadow: 2px 2px 0 #fff;
+    margin-top: 1rem;
+  }
+
+  /* Round indicator */
+  .round-indicator {
+    font-size: 1.1rem;
+    color: #6c5ce7;
+    margin: 0.3rem 0 0;
+  }
+
+  /* Progress dots */
+  .progress {
+    display: flex;
+    gap: 0.6rem;
+    margin: 0.5rem 0;
+  }
+
+  .dot {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: #ddd;
+    border: 2px solid #bbb;
+    transition: background 0.3s, border-color 0.3s, transform 0.3s;
+  }
+
+  .dot.active {
+    background: #f9ca24;
+    border-color: #f0932b;
+    transform: scale(1.25);
+  }
+
+  .dot.correct {
+    background: #2ecc71;
+    border-color: #27ae60;
+  }
+
+  .dot.wrong {
+    background: #e74c3c;
+    border-color: #c0392b;
+  }
+
+  /* Animal area */
+  .animal-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0.5rem 0 1rem;
+    position: relative;
+  }
+
+  .speech-bubble {
+    background: #fff;
+    border-radius: 1.5rem;
+    padding: 0.8rem 1.5rem;
+    font-size: 1.3rem;
+    color: #2d3436;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    margin-bottom: 0.8rem;
+    text-align: center;
+    max-width: 90vw;
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 16px solid #fff;
+  }
+
+  .animal-emoji {
+    font-size: 8rem;
+    line-height: 1;
+    transition: transform 0.3s;
+    width: 140px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #dfe6e9, #b2bec3);
+    cursor: pointer;
+  }
+
+  .hint-label {
+    font-size: 0.85rem;
+    color: #999;
+    margin-top: 0.2rem;
+    transition: opacity 0.3s;
+  }
+
+  .animal-name {
+    font-size: 1.8rem;
+    color: #6c5ce7;
+    margin-top: 0.3rem;
+  }
+
+  /* Animations on animal */
+  .animal-emoji.bounce {
+    animation: bounce 0.5s ease 3;
+  }
+
+  .animal-emoji.shake {
+    animation: shake 0.4s ease;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-30px); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-15px); }
+    40% { transform: translateX(15px); }
+    60% { transform: translateX(-10px); }
+    80% { transform: translateX(10px); }
+  }
+
+  /* Feedback text */
+  .feedback {
+    font-size: 1.6rem;
+    min-height: 2.2rem;
+    margin: 0.3rem 0;
+    transition: opacity 0.3s;
+  }
+
+  .feedback.yum { color: #2ecc71; }
+  .feedback.nope { color: #e74c3c; }
+
+  /* Fun fact */
+  .fun-fact {
+    background: #fff3cd;
+    border: 2px solid #f0932b;
+    border-radius: 1rem;
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+    color: #6c5ce7;
+    max-width: 500px;
+    text-align: center;
+    margin: 0.4rem 0;
+    min-height: 1.6rem;
+    font-family: 'Fredoka One', cursive;
+  }
+
+  /* Food choices */
+  .food-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0 2rem;
+    max-width: 700px;
+  }
+
+  .food-card {
+    background: #fff;
+    border: 4px solid #dfe6e9;
+    border-radius: 1.2rem;
+    padding: 1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    min-width: 110px;
+  }
+
+  .food-card:hover {
+    transform: scale(1.08);
+    border-color: #6c5ce7;
+    box-shadow: 0 6px 20px rgba(108,92,231,0.25);
+  }
+
+  .food-card:active {
+    transform: scale(0.96);
+  }
+
+  .food-card.correct-pick {
+    border-color: #2ecc71;
+    background: #d4efdf;
+  }
+
+  .food-card.wrong-pick {
+    border-color: #e74c3c;
+    background: #fadbd8;
+  }
+
+  .food-card .emoji {
+    font-size: 3.2rem;
+    line-height: 1;
+  }
+
+  .food-card .label {
+    font-size: 1rem;
+    color: #2d3436;
+    margin-top: 0.3rem;
+  }
+
+  /* Next button */
+  .next-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.4rem;
+    padding: 0.7rem 2.2rem;
+    border: none;
+    border-radius: 2rem;
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(108,92,231,0.4);
+    transition: transform 0.15s;
+    display: none;
+    margin: 0.5rem 0 1.5rem;
+  }
+
+  .next-btn:hover { transform: scale(1.08); }
+  .next-btn:active { transform: scale(0.96); }
+
+  /* End screen */
+  .end-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 2rem;
+    animation: fadeIn 0.6s ease;
+  }
+
+  .end-screen .trophy { font-size: 6rem; }
+  .end-screen .score-text { font-size: 2rem; color: #6c5ce7; margin: 1rem 0; }
+  .end-screen .score-msg { font-size: 1.3rem; color: #2d3436; margin-bottom: 1rem; }
+
+  .play-again-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.4rem;
+    padding: 0.8rem 2.5rem;
+    border: none;
+    border-radius: 2rem;
+    background: linear-gradient(135deg, #00b894, #55efc4);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,184,148,0.4);
+    transition: transform 0.15s;
+  }
+
+  .play-again-btn:hover { transform: scale(1.08); }
+  .play-again-btn:active { transform: scale(0.96); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Feed the Animals!</h1>
+<div class="round-indicator" id="roundIndicator"></div>
+
+<div class="progress" id="progress"></div>
+
+<div class="game-area" id="gameArea">
+  <div class="animal-area">
+    <div class="speech-bubble" id="speechBubble"></div>
+    <div class="animal-emoji" id="animalEmoji"></div>
+    <div class="animal-name" id="animalName"></div>
+    <div class="hint-label" id="hintLabel">Tap me for a hint!</div>
+  </div>
+
+  <div class="feedback" id="feedback"></div>
+  <div class="fun-fact" id="funFact"></div>
+
+  <div class="food-grid" id="foodGrid"></div>
+
+  <button class="next-btn" id="nextBtn">Next Animal!</button>
+</div>
+
+<div class="end-screen" id="endScreen">
+  <div class="trophy">🏆</div>
+  <div class="score-text" id="scoreText"></div>
+  <div class="score-msg" id="scoreMsg"></div>
+  <button class="play-again-btn" id="playAgainBtn">Play Again!</button>
+</div>
+
+<script>
+  var ANIMALS = [
+    { name: 'Lion',      emoji: '🦁', food: 'Meat',    foodEmoji: '🥩', fact: 'Lions sleep up to 20 hours a day!' },
+    { name: 'Rabbit',    emoji: '🐰', food: 'Carrot',  foodEmoji: '🥕', fact: "Rabbits' teeth never stop growing!" },
+    { name: 'Monkey',    emoji: '🐵', food: 'Banana',  foodEmoji: '🍌', fact: 'Monkeys use tools to crack open nuts!' },
+    { name: 'Bear',      emoji: '🐻', food: 'Honey',   foodEmoji: '🍯', fact: 'Bears can smell food from 20 miles away!' },
+    { name: 'Panda',     emoji: '🐼', food: 'Bamboo',  foodEmoji: '🎋', fact: 'Pandas eat up to 38 kg of bamboo every day!' },
+    { name: 'Dog',       emoji: '🐶', food: 'Bone',    foodEmoji: '🦴', fact: 'Dogs can understand up to 250 words!' },
+    { name: 'Cat',       emoji: '🐱', food: 'Fish',    foodEmoji: '🐟', fact: 'Cats sleep for 70% of their lives!' },
+    { name: 'Horse',     emoji: '🐴', food: 'Apple',   foodEmoji: '🍎', fact: 'Horses can sleep standing up!' },
+    { name: 'Elephant',  emoji: '🐘', food: 'Peanuts', foodEmoji: '🥜', fact: 'Elephants are afraid of bees!' },
+    { name: 'Penguin',   emoji: '🐧', food: 'Fish',    foodEmoji: '🐟', fact: 'Penguins propose with a pebble!' },
+    { name: 'Cow',       emoji: '🐮', food: 'Grass',   foodEmoji: '🌿', fact: 'Cows have best friends!' },
+    { name: 'Pig',       emoji: '🐷', food: 'Corn',    foodEmoji: '🌽', fact: 'Pigs are smarter than dogs!' },
+    { name: 'Frog',      emoji: '🐸', food: 'Bug',     foodEmoji: '🐛', fact: 'Some frogs can freeze and come back to life!' },
+    { name: 'Owl',       emoji: '🦉', food: 'Mouse',   foodEmoji: '🐭', fact: 'Owls can turn their heads 270 degrees!' },
+    { name: 'Parrot',    emoji: '🦜', food: 'Seeds',   foodEmoji: '🌰', fact: 'Parrots can live for over 80 years!' },
+    { name: 'Koala',     emoji: '🐨', food: 'Leaves',  foodEmoji: '🍃', fact: 'Koalas sleep up to 22 hours a day!' },
+    { name: 'Giraffe',   emoji: '🦒', food: 'Leaves',  foodEmoji: '🍃', fact: 'Giraffe tongues are 20 inches long!' },
+    { name: 'Squirrel',  emoji: '🐿️', food: 'Acorn',   foodEmoji: '🌰', fact: 'Squirrels plant thousands of trees by forgetting where they buried nuts!' },
+    { name: 'Hamster',   emoji: '🐹', food: 'Seeds',   foodEmoji: '🌰', fact: 'Hamsters can run 5 miles per night on their wheel!' },
+    { name: 'Dolphin',   emoji: '🐬', food: 'Fish',    foodEmoji: '🐟', fact: 'Dolphins sleep with one eye open!' },
+    { name: 'Shark',     emoji: '🦈', food: 'Fish',    foodEmoji: '🐟', fact: 'Sharks have been around longer than trees!' },
+    { name: 'Eagle',     emoji: '🦅', food: 'Fish',    foodEmoji: '🐟', fact: 'Eagles can see a rabbit from 2 miles away!' },
+    { name: 'Gorilla',   emoji: '🦍', food: 'Banana',  foodEmoji: '🍌', fact: 'Gorillas share 98% of their DNA with humans!' },
+    { name: 'Zebra',     emoji: '🦓', food: 'Grass',   foodEmoji: '🌿', fact: 'Every zebra has unique stripes like fingerprints!' },
+    { name: 'Fox',       emoji: '🦊', food: 'Berries', foodEmoji: '🫐', fact: "Foxes use Earth's magnetic field to hunt!" },
+    { name: 'Seal',      emoji: '🦭', food: 'Fish',    foodEmoji: '🐟', fact: 'Seals can hold their breath for 2 hours!' },
+    { name: 'Flamingo',  emoji: '🦩', food: 'Shrimp',  foodEmoji: '🦐', fact: 'Flamingos are pink because of what they eat!' },
+    { name: 'Hedgehog',  emoji: '🦔', food: 'Bug',     foodEmoji: '🐛', fact: 'Hedgehogs are immune to most snake venom!' },
+    { name: 'Turtle',    emoji: '🐢', food: 'Lettuce', foodEmoji: '🥬', fact: 'Some turtles can breathe through their butts!' },
+    { name: 'Whale',     emoji: '🐋', food: 'Krill',   foodEmoji: '🦐', fact: 'Blue whales are the biggest animals ever!' },
+    { name: 'Raccoon',   emoji: '🦝', food: 'Berries', foodEmoji: '🫐', fact: 'Raccoons wash their food before eating!' },
+    { name: 'Deer',      emoji: '🦌', food: 'Grass',   foodEmoji: '🌿', fact: 'Deer can jump up to 10 feet high!' },
+    { name: 'Chicken',   emoji: '🐔', food: 'Corn',    foodEmoji: '🌽', fact: 'Chickens can dream when they sleep!' },
+    { name: 'Duck',      emoji: '🦆', food: 'Bread',   foodEmoji: '🍞', fact: "Ducks' quacks don't echo!" },
+    { name: 'Bat',       emoji: '🦇', food: 'Bug',     foodEmoji: '🐛', fact: 'Bats are the only flying mammals!' }
+  ];
+
+  var TOTAL_ROUNDS = 12;
+  var roundAnimals = [];
+  var currentRound = 0;
+  var firstTryCorrect = 0;
+  var usedAttempt = false;
+
+  var progressEl = document.getElementById('progress');
+  var roundIndicatorEl = document.getElementById('roundIndicator');
+  var speechBubbleEl = document.getElementById('speechBubble');
+  var animalEmojiEl = document.getElementById('animalEmoji');
+  var animalNameEl = document.getElementById('animalName');
+  var feedbackEl = document.getElementById('feedback');
+  var funFactEl = document.getElementById('funFact');
+  var foodGridEl = document.getElementById('foodGrid');
+  var nextBtnEl = document.getElementById('nextBtn');
+  var gameAreaEl = document.getElementById('gameArea');
+  var endScreenEl = document.getElementById('endScreen');
+  var scoreTextEl = document.getElementById('scoreText');
+  var scoreMsgEl = document.getElementById('scoreMsg');
+  var playAgainBtnEl = document.getElementById('playAgainBtn');
+
+  function shuffle(arr) {
+    var copy = arr.slice();
+    for (var i = copy.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = temp;
+    }
+    return copy;
+  }
+
+  function buildProgress() {
+    progressEl.textContent = '';
+    for (var i = 0; i < TOTAL_ROUNDS; i++) {
+      var dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.setAttribute('data-index', String(i));
+      progressEl.appendChild(dot);
+    }
+  }
+
+  function updateDot(index, state) {
+    var dot = progressEl.querySelector('[data-index="' + index + '"]');
+    if (dot) {
+      dot.classList.remove('active');
+      dot.classList.add(state);
+    }
+  }
+
+  function highlightDot(index) {
+    var dots = progressEl.querySelectorAll('.dot');
+    for (var i = 0; i < dots.length; i++) {
+      dots[i].classList.remove('active');
+    }
+    if (index < TOTAL_ROUNDS) {
+      dots[index].classList.add('active');
+    }
+  }
+
+  function getAllFoods() {
+    var seen = {};
+    var foods = [];
+    for (var i = 0; i < ANIMALS.length; i++) {
+      var key = ANIMALS[i].food;
+      if (!seen[key]) {
+        seen[key] = true;
+        foods.push({ name: ANIMALS[i].food, emoji: ANIMALS[i].foodEmoji });
+      }
+    }
+    return foods;
+  }
+
+  var ALL_FOODS = getAllFoods();
+
+  function pickWrongFoods(correctFood, count) {
+    var options = [];
+    for (var i = 0; i < ALL_FOODS.length; i++) {
+      if (ALL_FOODS[i].name !== correctFood) {
+        options.push(ALL_FOODS[i]);
+      }
+    }
+    var shuffled = shuffle(options);
+    return shuffled.slice(0, count);
+  }
+
+  function startGame() {
+    currentRound = 0;
+    firstTryCorrect = 0;
+    roundAnimals = shuffle(ANIMALS).slice(0, TOTAL_ROUNDS);
+    endScreenEl.style.display = 'none';
+    gameAreaEl.style.display = 'flex';
+    buildProgress();
+    showRound();
+  }
+
+  function showRound() {
+    var animal = roundAnimals[currentRound];
+    usedAttempt = false;
+
+    highlightDot(currentRound);
+    roundIndicatorEl.textContent = 'Round ' + (currentRound + 1) + ' of ' + TOTAL_ROUNDS;
+
+    speechBubbleEl.textContent = "I'm hungry! What do I eat?";
+    animalEmojiEl.textContent = animal.emoji;
+    animalEmojiEl.className = 'animal-emoji';
+    animalNameEl.textContent = animal.name;
+    document.getElementById('hintLabel').textContent = 'Tap me for a hint!';
+    document.getElementById('hintLabel').style.opacity = '1';
+
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'feedback';
+    funFactEl.textContent = '';
+    nextBtnEl.style.display = 'none';
+
+    var wrongFoods = pickWrongFoods(animal.food, 4);
+    var choices = shuffle(
+      wrongFoods.concat([{ name: animal.food, emoji: animal.foodEmoji }])
+    );
+
+    foodGridEl.textContent = '';
+
+    for (var i = 0; i < choices.length; i++) {
+      var card = document.createElement('div');
+      card.className = 'food-card';
+      card.setAttribute('data-food', choices[i].name);
+
+      var emojiDiv = document.createElement('div');
+      emojiDiv.className = 'emoji';
+      emojiDiv.textContent = choices[i].emoji;
+      card.appendChild(emojiDiv);
+
+      var labelDiv = document.createElement('div');
+      labelDiv.className = 'label';
+      labelDiv.textContent = choices[i].name;
+      card.appendChild(labelDiv);
+
+      card.addEventListener('click', handleFoodClick);
+      foodGridEl.appendChild(card);
+    }
+  }
+
+  function handleFoodClick(e) {
+    var card = e.currentTarget;
+    var chosenFood = card.getAttribute('data-food');
+    var animal = roundAnimals[currentRound];
+
+    if (chosenFood === animal.food) {
+      card.classList.add('correct-pick');
+      animalEmojiEl.className = 'animal-emoji bounce';
+
+      feedbackEl.textContent = 'Yum! 😋';
+      feedbackEl.className = 'feedback yum';
+
+      funFactEl.textContent = '⭐ ' + animal.fact;
+
+      if (!usedAttempt) {
+        firstTryCorrect++;
+        updateDot(currentRound, 'correct');
+      }
+
+      disableAllCards();
+      nextBtnEl.style.display = 'block';
+    } else {
+      if (!usedAttempt) {
+        usedAttempt = true;
+        updateDot(currentRound, 'wrong');
+      }
+      card.classList.add('wrong-pick');
+      animalEmojiEl.className = 'animal-emoji shake';
+
+      feedbackEl.textContent = 'Not that! Try again!';
+      feedbackEl.className = 'feedback nope';
+
+      card.style.pointerEvents = 'none';
+      card.style.opacity = '0.5';
+
+      setTimeout(function() {
+        animalEmojiEl.className = 'animal-emoji';
+      }, 400);
+    }
+  }
+
+  function disableAllCards() {
+    var cards = foodGridEl.querySelectorAll('.food-card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].style.pointerEvents = 'none';
+    }
+  }
+
+  nextBtnEl.addEventListener('click', function() {
+    currentRound++;
+    if (currentRound >= TOTAL_ROUNDS) {
+      showEndScreen();
+    } else {
+      showRound();
+    }
+  });
+
+  function showEndScreen() {
+    gameAreaEl.style.display = 'none';
+    endScreenEl.style.display = 'flex';
+    roundIndicatorEl.textContent = '';
+
+    scoreTextEl.textContent = firstTryCorrect + ' out of ' + TOTAL_ROUNDS + ' on the first try!';
+
+    var msg;
+    if (firstTryCorrect === TOTAL_ROUNDS) {
+      msg = 'Perfect! You are an Animal Expert! 🌟';
+    } else if (firstTryCorrect >= 9) {
+      msg = 'Amazing! The animals love you! 🎉';
+    } else if (firstTryCorrect >= 6) {
+      msg = 'Great job! Keep learning about animals! 💪';
+    } else if (firstTryCorrect >= 3) {
+      msg = 'Good try! Play again to learn more! 😊';
+    } else {
+      msg = 'Nice effort! You can do it! 🌈';
+    }
+    scoreMsgEl.textContent = msg;
+  }
+
+  playAgainBtnEl.addEventListener('click', startGame);
+
+  animalEmojiEl.addEventListener('click', function() {
+    if (currentRound < TOTAL_ROUNDS) {
+      var animal = roundAnimals[currentRound];
+      speechBubbleEl.textContent = "Feed me " + animal.food + "! " + animal.foodEmoji;
+      document.getElementById('hintLabel').textContent = '';
+      document.getElementById('hintLabel').style.opacity = '0';
+    }
+  });
+
+  startGame();
+</script>
+</body>
+</html>

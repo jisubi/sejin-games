@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Match</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka One', cursive;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 50%, #d4fc79 100%);
+    background-size: 400% 400%;
+    animation: bgShift 12s ease infinite;
+    overflow-x: hidden;
+  }
+
+  @keyframes bgShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ── Screens ── */
+  #start-screen, #difficulty-screen, #game-screen, #win-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 620px;
+    padding: 20px;
+  }
+  #start-screen.active, #difficulty-screen.active, #game-screen.active, #win-screen.active {
+    display: flex;
+  }
+
+  h1 {
+    font-size: 2.6rem;
+    color: #fff;
+    text-shadow: 3px 3px 0 #e85d75, 5px 5px 0 rgba(0,0,0,.12);
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 1.15rem;
+    color: #555;
+    margin-bottom: 24px;
+  }
+
+  /* Category cards */
+  .category-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .category-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none;
+    border-radius: 20px;
+    padding: 22px 10px;
+    cursor: pointer;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,.2);
+    box-shadow: 0 6px 0 rgba(0,0,0,.15), 0 8px 20px rgba(0,0,0,.1);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .category-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.1);
+  }
+  .category-btn .emoji { font-size: 2.4rem; }
+  .cat-dinos   { background: linear-gradient(135deg, #56ab2f, #a8e063); }
+  .cat-animals { background: linear-gradient(135deg, #f7971e, #ffd200); }
+  .cat-plants  { background: linear-gradient(135deg, #11998e, #38ef7d); }
+  .cat-letters { background: linear-gradient(135deg, #6a11cb, #bc7ff5); }
+  .cat-numbers { background: linear-gradient(135deg, #eb3349, #f45c43); }
+
+  /* ── Difficulty Screen ── */
+  #difficulty-screen h2 {
+    font-size: 2rem;
+    color: #fff;
+    text-shadow: 2px 2px 0 #e85d75;
+    margin-bottom: 6px;
+  }
+  .difficulty-category-label {
+    font-size: 1.2rem;
+    color: #555;
+    margin-bottom: 24px;
+  }
+  .difficulty-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .difficulty-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: none;
+    border-radius: 20px;
+    padding: 22px 20px;
+    cursor: pointer;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.2rem;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,.2);
+    box-shadow: 0 6px 0 rgba(0,0,0,.15), 0 8px 20px rgba(0,0,0,.1);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .difficulty-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.1);
+  }
+  .diff-easy   { background: linear-gradient(135deg, #56ab2f, #a8e063); }
+  .diff-medium { background: linear-gradient(135deg, #f7971e, #ffd200); }
+  .diff-hard   { background: linear-gradient(135deg, #eb3349, #f45c43); }
+
+  .difficulty-btn .diff-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .difficulty-btn .diff-name {
+    font-size: 1.3rem;
+  }
+  .difficulty-btn .diff-detail {
+    font-size: 0.8rem;
+    opacity: 0.85;
+  }
+  .difficulty-btn .diff-stars {
+    font-size: 1.4rem;
+    margin-left: auto;
+  }
+
+  .diff-back-btn {
+    margin-top: 16px;
+    border: none;
+    background: rgba(255,255,255,.6);
+    border-radius: 12px;
+    padding: 10px 24px;
+    font-family: 'Fredoka One', cursive;
+    font-size: .95rem;
+    cursor: pointer;
+    color: #555;
+    transition: transform .12s;
+  }
+  .diff-back-btn:active { transform: translateY(2px); }
+
+  /* ── Game Screen ── */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  .top-bar span { font-size: 1.1rem; color: #444; }
+  .back-btn {
+    border: none;
+    background: rgba(255,255,255,.6);
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-family: 'Fredoka One', cursive;
+    font-size: .95rem;
+    cursor: pointer;
+    color: #555;
+  }
+
+  /* Card grid */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .card-grid.grid-3 { grid-template-columns: repeat(3, 1fr); max-width: 320px; }
+  .card-grid.grid-4 { grid-template-columns: repeat(4, 1fr); max-width: 420px; }
+  .card-grid.grid-6 { grid-template-columns: repeat(6, 1fr); max-width: 560px; }
+
+  /* Single card wrapper */
+  .card {
+    aspect-ratio: 1;
+    min-width: 60px;
+    perspective: 600px;
+    cursor: pointer;
+  }
+  .card-grid.grid-3 .card { min-width: 80px; }
+  .card-grid.grid-4 .card { min-width: 65px; }
+  .card-grid.grid-6 .card { min-width: 50px; }
+
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform .45s;
+    transform-style: preserve-3d;
+  }
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+
+  .card-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backface-visibility: hidden;
+    font-size: 2.2rem;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .card-grid.grid-6 .card-face { font-size: 1.5rem; border-radius: 10px; }
+
+  .card-front {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    box-shadow: 0 4px 0 rgba(0,0,0,.18);
+  }
+  .card-front::after {
+    content: '?';
+    font-size: 2.4rem;
+  }
+  .card-grid.grid-6 .card-front::after { font-size: 1.4rem; }
+
+  .card-back {
+    transform: rotateY(180deg);
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  }
+
+  /* Match / mismatch feedback */
+  .card.matched .card-back {
+    box-shadow: 0 0 18px 4px #4cdf6b;
+    background: #e8ffe8;
+  }
+  .card.wrong .card-back {
+    animation: wrongFlash .35s;
+  }
+  @keyframes wrongFlash {
+    0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+    50%      { box-shadow: 0 0 16px 4px #ff4d4d; }
+  }
+
+  /* ── Win Screen ── */
+  #win-screen h2 {
+    font-size: 2.2rem;
+    color: #fff;
+    text-shadow: 2px 2px 0 #e85d75;
+    margin-bottom: 12px;
+  }
+  .stars { font-size: 3rem; margin: 12px 0; }
+  .stats { font-size: 1.15rem; color: #444; margin-bottom: 24px; }
+  .play-again-btn {
+    border: none;
+    border-radius: 18px;
+    padding: 16px 40px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.2rem;
+    color: #fff;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    box-shadow: 0 6px 0 rgba(0,0,0,.15);
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .play-again-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0,0,0,.15);
+  }
+
+  /* Confetti container */
+  .confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 10;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    top: -20px;
+    animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* Match pop emoji */
+  .match-pop {
+    position: fixed;
+    font-size: 2.6rem;
+    pointer-events: none;
+    animation: popUp .7s ease-out forwards;
+    z-index: 20;
+  }
+  @keyframes popUp {
+    0%   { transform: scale(0) translateY(0); opacity: 1; }
+    50%  { transform: scale(1.3) translateY(-40px); opacity: 1; }
+    100% { transform: scale(1) translateY(-80px); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="start-screen" class="active">
+  <h1>Memory Match</h1>
+  <p class="subtitle">Pick a category!</p>
+  <div class="category-grid" id="category-grid"></div>
+</div>
+
+<!-- DIFFICULTY SCREEN -->
+<div id="difficulty-screen">
+  <h2>Choose Difficulty</h2>
+  <p class="difficulty-category-label" id="difficulty-category-label"></p>
+  <div class="difficulty-grid" id="difficulty-grid">
+    <button class="difficulty-btn diff-easy" data-difficulty="easy">
+      <div class="diff-info">
+        <span class="diff-name">Easy</span>
+        <span class="diff-detail">3 x 4 grid &#x2022; 6 pairs</span>
+      </div>
+      <span class="diff-stars">&#x2B50;</span>
+    </button>
+    <button class="difficulty-btn diff-medium" data-difficulty="medium">
+      <div class="diff-info">
+        <span class="diff-name">Medium</span>
+        <span class="diff-detail">4 x 6 grid &#x2022; 12 pairs</span>
+      </div>
+      <span class="diff-stars">&#x2B50;&#x2B50;</span>
+    </button>
+    <button class="difficulty-btn diff-hard" data-difficulty="hard">
+      <div class="diff-info">
+        <span class="diff-name">Hard</span>
+        <span class="diff-detail">6 x 6 grid &#x2022; 18 pairs</span>
+      </div>
+      <span class="diff-stars">&#x2B50;&#x2B50;&#x2B50;</span>
+    </button>
+  </div>
+  <button class="diff-back-btn" id="diff-back-btn">Back</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen">
+  <div class="top-bar">
+    <button class="back-btn" id="back-btn">Back</button>
+    <span id="attempts-label">Attempts: 0</span>
+  </div>
+  <div class="card-grid" id="card-grid"></div>
+</div>
+
+<!-- WIN SCREEN -->
+<div id="win-screen">
+  <h2>You Did It!</h2>
+  <div class="stars" id="stars"></div>
+  <p class="stats" id="stats"></p>
+  <button class="play-again-btn" id="play-again-btn">Play Again</button>
+</div>
+
+<script>
+(function () {
+  /* ── Category data (at least 10 items each for Hard mode) ── */
+  var CATEGORIES = [
+    {
+      name: 'Dinosaurs',
+      cls: 'cat-dinos',
+      icon: '\uD83E\uDD95',
+      items: ['\uD83E\uDD96', '\uD83E\uDD95', '\uD83D\uDC32', '\uD83D\uDC09', '\uD83E\uDDB4', '\uD83C\uDF0B', '\uD83E\uDDA7', '\uD83D\uDC22', '\uD83D\uDC0D', '\uD83E\uDD8E', '\uD83D\uDC0A', '\uD83D\uDC1A', '\uD83E\uDD82', '\uD83E\uDD9E', '\uD83D\uDC1B', '\uD83E\uDD9C', '\uD83E\uDD85', '\uD83E\uDD89']
+    },
+    {
+      name: 'Animals',
+      cls: 'cat-animals',
+      icon: '\uD83D\uDC3E',
+      items: ['\uD83E\uDD81', '\uD83D\uDC36', '\uD83D\uDC31', '\uD83D\uDC3B', '\uD83D\uDC37', '\uD83D\uDC38', '\uD83E\uDD8B', '\uD83D\uDC2C', '\uD83D\uDC27', '\uD83E\uDD8A', '\uD83D\uDC34', '\uD83D\uDC2E', '\uD83D\uDC35', '\uD83D\uDC30', '\uD83D\uDC18', '\uD83E\uDD92', '\uD83E\uDD93', '\uD83D\uDC3C']
+    },
+    {
+      name: 'Plants',
+      cls: 'cat-plants',
+      icon: '\uD83C\uDF3F',
+      items: ['\uD83C\uDF38', '\uD83C\uDF33', '\uD83C\uDF35', '\uD83C\uDF3B', '\uD83C\uDF3A', '\uD83C\uDF40', '\uD83C\uDF3E', '\uD83C\uDF3C', '\uD83C\uDF37', '\uD83C\uDF39', '\uD83C\uDF3F', '\uD83C\uDF32', '\uD83C\uDF34', '\uD83E\uDEB5', '\uD83E\uDEB4', '\uD83E\uDD40', '\uD83C\uDF41', '\uD83C\uDF42']
+    },
+    {
+      name: 'Letters',
+      cls: 'cat-letters',
+      icon: '\uD83D\uDD24',
+      items: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'W']
+    },
+    {
+      name: 'Numbers',
+      cls: 'cat-numbers',
+      icon: '\uD83D\uDD22',
+      items: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18']
+    }
+  ];
+
+  /* ── Difficulty settings ── */
+  var DIFFICULTIES = {
+    easy:   { pairs: 6,  cols: 3, star3: 7,  star2: 10 },
+    medium: { pairs: 12, cols: 4, star3: 14, star2: 18 },
+    hard:   { pairs: 18, cols: 6, star3: 22, star2: 30 }
+  };
+
+  /* ── DOM refs ── */
+  var startScreen      = document.getElementById('start-screen');
+  var difficultyScreen = document.getElementById('difficulty-screen');
+  var gameScreen       = document.getElementById('game-screen');
+  var winScreen        = document.getElementById('win-screen');
+  var categoryGrid     = document.getElementById('category-grid');
+  var cardGrid         = document.getElementById('card-grid');
+  var attemptsLabel    = document.getElementById('attempts-label');
+  var starsEl          = document.getElementById('stars');
+  var statsEl          = document.getElementById('stats');
+  var backBtn          = document.getElementById('back-btn');
+  var playAgainBtn     = document.getElementById('play-again-btn');
+  var diffBackBtn      = document.getElementById('diff-back-btn');
+  var diffCatLabel     = document.getElementById('difficulty-category-label');
+
+  /* ── State ── */
+  var firstCard      = null;
+  var secondCard     = null;
+  var lockBoard      = false;
+  var attempts       = 0;
+  var matchCount     = 0;
+  var totalPairs     = 8;
+  var currentDifficulty = 'medium';
+  var selectedCategory  = null;
+
+  /* ── Helpers ── */
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function showScreen(screen) {
+    startScreen.classList.remove('active');
+    difficultyScreen.classList.remove('active');
+    gameScreen.classList.remove('active');
+    winScreen.classList.remove('active');
+    screen.classList.add('active');
+  }
+
+  /* ── Build category buttons ── */
+  CATEGORIES.forEach(function (cat) {
+    var btn = document.createElement('button');
+    btn.className = 'category-btn ' + cat.cls;
+
+    var emojiSpan = document.createElement('span');
+    emojiSpan.className = 'emoji';
+    emojiSpan.textContent = cat.icon;
+
+    var nameSpan = document.createElement('span');
+    nameSpan.textContent = cat.name;
+
+    btn.appendChild(emojiSpan);
+    btn.appendChild(nameSpan);
+
+    btn.addEventListener('click', function () {
+      selectedCategory = cat;
+      diffCatLabel.textContent = cat.icon + ' ' + cat.name;
+      showScreen(difficultyScreen);
+    });
+    categoryGrid.appendChild(btn);
+  });
+
+  /* ── Difficulty button handlers ── */
+  var diffBtns = document.querySelectorAll('.difficulty-btn');
+  for (var d = 0; d < diffBtns.length; d++) {
+    (function (btn) {
+      btn.addEventListener('click', function () {
+        currentDifficulty = btn.getAttribute('data-difficulty');
+        startGame(selectedCategory, currentDifficulty);
+      });
+    })(diffBtns[d]);
+  }
+
+  /* ── Back from difficulty to categories ── */
+  diffBackBtn.addEventListener('click', function () {
+    showScreen(startScreen);
+  });
+
+  /* ── Start game ── */
+  function startGame(cat, difficulty) {
+    var settings = DIFFICULTIES[difficulty];
+    totalPairs = settings.pairs;
+
+    attempts = 0;
+    matchCount = 0;
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
+    attemptsLabel.textContent = 'Attempts: 0';
+
+    /* Remove old cards */
+    while (cardGrid.firstChild) { cardGrid.removeChild(cardGrid.firstChild); }
+
+    /* Set grid class */
+    cardGrid.className = 'card-grid grid-' + settings.cols;
+
+    /* Pick items for this difficulty and build pairs */
+    var items = cat.items.slice(0, totalPairs);
+    var deck = [];
+    items.forEach(function (item) {
+      deck.push(item, item);
+    });
+    shuffle(deck);
+
+    /* Create card elements */
+    deck.forEach(function (value) {
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.setAttribute('data-value', value);
+
+      var inner = document.createElement('div');
+      inner.className = 'card-inner';
+
+      var front = document.createElement('div');
+      front.className = 'card-face card-front';
+
+      var back = document.createElement('div');
+      back.className = 'card-face card-back';
+      back.textContent = value;
+
+      inner.appendChild(front);
+      inner.appendChild(back);
+      card.appendChild(inner);
+
+      card.addEventListener('click', function () { flipCard(card); });
+      cardGrid.appendChild(card);
+    });
+
+    showScreen(gameScreen);
+  }
+
+  /* ── Flip logic ── */
+  function flipCard(card) {
+    if (lockBoard) return;
+    if (card === firstCard) return;
+    if (card.classList.contains('matched')) return;
+    if (card.classList.contains('flipped')) return;
+
+    card.classList.add('flipped');
+
+    if (!firstCard) {
+      firstCard = card;
+      return;
+    }
+
+    secondCard = card;
+    lockBoard = true;
+    attempts++;
+    attemptsLabel.textContent = 'Attempts: ' + attempts;
+
+    var val1 = firstCard.getAttribute('data-value');
+    var val2 = secondCard.getAttribute('data-value');
+
+    if (val1 === val2) {
+      handleMatch();
+    } else {
+      handleMismatch();
+    }
+  }
+
+  function handleMatch() {
+    firstCard.classList.add('matched');
+    secondCard.classList.add('matched');
+
+    /* Pop emoji celebration between the two cards */
+    spawnMatchPop(firstCard);
+    spawnMatchPop(secondCard);
+
+    matchCount++;
+    resetTurn();
+
+    if (matchCount === totalPairs) {
+      setTimeout(showWin, 600);
+    }
+  }
+
+  function handleMismatch() {
+    firstCard.classList.add('wrong');
+    secondCard.classList.add('wrong');
+
+    var fc = firstCard;
+    var sc = secondCard;
+
+    setTimeout(function () {
+      fc.classList.remove('flipped', 'wrong');
+      sc.classList.remove('flipped', 'wrong');
+      resetTurn();
+    }, 1000);
+  }
+
+  function resetTurn() {
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
+  }
+
+  /* ── Match pop effect ── */
+  function spawnMatchPop(card) {
+    var rect = card.getBoundingClientRect();
+    var el = document.createElement('div');
+    el.className = 'match-pop';
+    el.textContent = '\u2B50';
+    el.style.left = (rect.left + rect.width / 2 - 16) + 'px';
+    el.style.top  = (rect.top + rect.height / 2) + 'px';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', function () { el.remove(); });
+  }
+
+  /* ── Win screen ── */
+  function showWin() {
+    var settings = DIFFICULTIES[currentDifficulty];
+    var stars;
+    if (attempts <= settings.star3)      stars = 3;
+    else if (attempts <= settings.star2) stars = 2;
+    else                                 stars = 1;
+
+    starsEl.textContent = '';
+    for (var i = 0; i < 3; i++) {
+      starsEl.textContent += i < stars ? '\u2B50' : '\u2606';
+    }
+
+    statsEl.textContent = 'You matched all pairs in ' + attempts + ' attempts!';
+    showScreen(winScreen);
+    launchConfetti();
+  }
+
+  /* ── Confetti ── */
+  function launchConfetti() {
+    var container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+
+    var colors = ['#ff6b6b','#feca57','#48dbfb','#ff9ff3','#54a0ff','#5f27cd','#01a3a4','#f368e0'];
+
+    for (var i = 0; i < 60; i++) {
+      var piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random() * 100 + '%';
+      piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      piece.style.animationDelay = (Math.random() * 0.8) + 's';
+      piece.style.width  = (6 + Math.random() * 8) + 'px';
+      piece.style.height = (6 + Math.random() * 8) + 'px';
+      container.appendChild(piece);
+    }
+
+    setTimeout(function () { container.remove(); }, 4500);
+  }
+
+  /* ── Navigation ── */
+  backBtn.addEventListener('click', function () { showScreen(startScreen); });
+  playAgainBtn.addEventListener('click', function () { showScreen(startScreen); });
+})();
+</script>
+</body>
+</html>

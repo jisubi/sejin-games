@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shapes and Colors</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: 'Nunito', 'Arial Rounded MT Bold', sans-serif;
+            background: linear-gradient(135deg, #e0f7fa 0%, #fce4ec 50%, #f3e5f5 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        #prompt-label {
+            position: relative;
+            font-size: clamp(2rem, 6vw, 3.5rem);
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            padding: 14px 40px;
+            border-radius: 60px;
+            margin-bottom: 28px;
+            box-shadow: 0 8px 24px rgba(255,107,107,0.35);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to   { transform: scale(1);   opacity: 1; }
+        }
+
+        #game-container {
+            display: flex;
+            gap: clamp(12px, 3vw, 28px);
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 10px 20px;
+            max-width: 95vw;
+        }
+
+        .shape-btn {
+            cursor: pointer;
+            transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), filter 0.2s;
+            filter: drop-shadow(0 6px 18px rgba(0,0,0,0.18));
+            border: none;
+            background: none;
+            padding: 0;
+            outline: none;
+        }
+
+        .shape-btn:hover  { transform: scale(1.13) rotate(-3deg); }
+        .shape-btn:active { transform: scale(0.88); }
+
+        .shape-btn.wrong-shake {
+            animation: shake 0.4s ease;
+        }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20%      { transform: translateX(-10px) rotate(-4deg); }
+            40%      { transform: translateX(10px)  rotate(4deg); }
+            60%      { transform: translateX(-8px)  rotate(-3deg); }
+            80%      { transform: translateX(8px)   rotate(3deg); }
+        }
+
+        /* ── Screens ── */
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #start-screen {
+            background: linear-gradient(160deg, #667eea 0%, #ff6b9d 100%);
+        }
+
+        #start-screen h1 {
+            font-size: clamp(2.8rem, 8vw, 5rem);
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+
+        #congratulations-screen {
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+
+        #congratulations-screen h1 {
+            font-size: clamp(2.5rem, 7vw, 4.5rem);
+            font-weight: 900;
+            color: #ff4081;
+            margin-bottom: 10px;
+        }
+
+        #congratulations-screen p {
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .play-btn {
+            padding: 18px 55px;
+            font-size: clamp(1.4rem, 4vw, 2rem);
+            font-family: 'Nunito', sans-serif;
+            font-weight: 900;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4ecdc4, #44cf6c);
+            color: white;
+            border: none;
+            border-radius: 60px;
+            box-shadow: 0 10px 0 #2a9d8f;
+            letter-spacing: 1px;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .play-btn:active {
+            box-shadow: 0 4px 0 #2a9d8f;
+            transform: translateY(6px);
+        }
+
+        /* Confetti */
+        .confetti {
+            position: fixed;
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            animation: fall 3s linear forwards;
+            z-index: 20;
+        }
+        @keyframes fall {
+            0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(105vh) rotate(720deg); opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen" class="screen">
+        <h1>🎨 Shapes &amp; Colors!</h1>
+        <button class="play-btn" onclick="startGame()">▶ PLAY</button>
+    </div>
+
+    <div id="prompt-label" style="display:none"></div>
+    <div id="game-container"></div>
+
+    <div id="congratulations-screen" class="screen">
+        <h1>🎉 Amazing! 🎉</h1>
+        <p>You found it! You're a star!</p>
+        <button class="play-btn" onclick="startGame()">▶ PLAY AGAIN</button>
+    </div>
+
+    <script>
+    // ── Expanded palette ──────────────────────────────────────────────────────
+    const COLORS = [
+        { name: 'Red',    hex: '#ef233c' },
+        { name: 'Blue',   hex: '#3a86ff' },
+        { name: 'Green',  hex: '#38b000' },
+        { name: 'Yellow', hex: '#ffd60a' },
+        { name: 'Purple', hex: '#9b5de5' },
+        { name: 'Orange', hex: '#fb5607' },
+        { name: 'Pink',   hex: '#ff006e' },
+        { name: 'Teal',   hex: '#00b4d8' },
+        { name: 'Brown',  hex: '#bc6c25' },
+        { name: 'Lime',   hex: '#80b918' },
+    ];
+
+    const SHAPES = ['Circle','Square','Triangle','Star','Heart','Diamond','Pentagon','Hexagon'];
+
+    // ── SVG builders ─────────────────────────────────────────────────────────
+    function buildPath(type) {
+        switch(type) {
+            case 'Circle':   return `<circle cx="75" cy="75" r="68"/>`;
+            case 'Square':   return `<rect x="8" y="8" width="134" height="134" rx="14"/>`;
+            case 'Triangle': return `<polygon points="75,6 144,144 6,144"/>`;
+            case 'Star':     return `<polygon points="75,5 91,57 147,57 102,90 119,145 75,112 31,145 48,90 3,57 59,57"/>`;
+            case 'Heart':    return `<path d="M75,130 C75,130 10,90 10,45 C10,22 28,8 50,8 C61,8 70,13 75,20 C80,13 89,8 100,8 C122,8 140,22 140,45 C140,90 75,130 75,130Z"/>`;
+            case 'Diamond':  return `<polygon points="75,5 140,75 75,145 10,75"/>`;
+            case 'Pentagon':
+                return `<polygon points="${poly(75,75,68,5,5)}"/>`;
+            case 'Hexagon':
+                return `<polygon points="${poly(75,75,68,6,0)}"/>`;
+        }
+    }
+
+    function poly(cx, cy, r, sides, offsetDeg) {
+        const pts = [];
+        for (let i = 0; i < sides; i++) {
+            const angle = (Math.PI * 2 / sides) * i - Math.PI / 2 + (offsetDeg * Math.PI / 180);
+            pts.push(`${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`);
+        }
+        return pts.join(' ');
+    }
+
+    function createShapeSVG(type, colorHex, size = 140) {
+        return `<svg width="${size}" height="${size}" viewBox="0 0 150 150" class="shape-btn" role="button" tabindex="0">
+            <g fill="${colorHex}" stroke="rgba(0,0,0,0.12)" stroke-width="3">
+                ${buildPath(type)}
+            </g>
+        </svg>`;
+    }
+
+    // ── Voice ────────────────────────────────────────────────────────────────
+    let preferredVoice = null;
+
+    function loadVoice() {
+        const voices = window.speechSynthesis.getVoices();
+        // Prefer warm, natural-sounding female voices
+        const preferred = ['Samantha','Karen','Moira','Tessa','Fiona','Victoria',
+                           'Google US English','Microsoft Zira','Ava','Allison'];
+        for (const name of preferred) {
+            const v = voices.find(v => v.name.includes(name));
+            if (v) { preferredVoice = v; return; }
+        }
+        // Fallback: first English voice
+        preferredVoice = voices.find(v => v.lang.startsWith('en')) || voices[0] || null;
+    }
+
+    window.speechSynthesis.onvoiceschanged = loadVoice;
+    loadVoice();
+
+    function speak(text, rate = 0.88, pitch = 1.1) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.rate  = rate;
+        msg.pitch = pitch;
+        msg.volume = 1;
+        if (preferredVoice) msg.voice = preferredVoice;
+        window.speechSynthesis.speak(msg);
+    }
+
+    // ── Game logic ───────────────────────────────────────────────────────────
+    const gameContainer = document.getElementById('game-container');
+    const promptLabel   = document.getElementById('prompt-label');
+    const startScreen   = document.getElementById('start-screen');
+    const winScreen     = document.getElementById('congratulations-screen');
+
+    function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function startGame() {
+        startScreen.style.display = 'none';
+        winScreen.style.display   = 'none';
+        gameContainer.innerHTML   = '';
+        promptLabel.style.display = 'block';
+
+        const COUNT = 6; // shapes on screen
+
+        // Decide challenge type
+        const isColorChallenge = Math.random() > 0.5;
+
+        // Pick target
+        const targetColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+        const targetShape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+
+        // Build distractors — guarantee exactly ONE match for the prompt
+        const usedCombos = new Set();
+        const options = [];
+
+        // Add the winner first
+        options.push({ color: targetColor, shape: targetShape, isWinner: true });
+        usedCombos.add(`${targetColor.name}|${targetShape}`);
+
+        // Fill remaining slots with non-matching items
+        let attempts = 0;
+        while (options.length < COUNT && attempts < 500) {
+            attempts++;
+            const c = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const s = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            const key = `${c.name}|${s}`;
+            if (usedCombos.has(key)) continue;
+
+            // Ensure no accidental match with the prompt
+            if (isColorChallenge && c.name === targetColor.name) continue;
+            if (!isColorChallenge && s === targetShape) continue;
+
+            usedCombos.add(key);
+            options.push({ color: c, shape: s, isWinner: false });
+        }
+
+        shuffle(options);
+
+        // Set prompt
+        const promptWord = isColorChallenge ? targetColor.name : targetShape;
+        promptLabel.innerText = promptWord;
+        promptLabel.style.animation = 'none';
+        void promptLabel.offsetWidth; // reflow to re-trigger
+        promptLabel.style.animation = '';
+
+        speak(`Can you find the ${promptWord}?`, 0.85, 1.12);
+
+        // Render shapes
+        options.forEach(opt => {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = createShapeSVG(opt.shape, opt.color.hex);
+            const svg = wrapper.firstElementChild;
+            svg.title = `${opt.color.name} ${opt.shape}`;
+
+            svg.onclick = () => handleClick(svg, opt, isColorChallenge, targetColor, targetShape);
+            svg.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') svg.click(); };
+
+            gameContainer.appendChild(svg);
+        });
+    }
+
+    function handleClick(el, opt, isColorChallenge, targetColor, targetShape) {
+        const isCorrect = isColorChallenge
+            ? opt.color.name === targetColor.name
+            : opt.shape === targetShape;
+
+        if (isCorrect) {
+            triggerWin(opt.color.name, opt.shape);
+        } else {
+            el.classList.remove('wrong-shake');
+            void el.offsetWidth;
+            el.classList.add('wrong-shake');
+            el.addEventListener('animationend', () => el.classList.remove('wrong-shake'), { once: true });
+
+            const tries = ['Hmm, not that one! Try again!',
+                           'Oops! Keep looking!',
+                           'Almost! Try another one!'];
+            speak(tries[Math.floor(Math.random() * tries.length)], 0.88, 1.1);
+        }
+    }
+
+    function triggerWin(colorName, shapeName) {
+        winScreen.style.display = 'flex';
+        speak(`Yes! That's the ${colorName} ${shapeName}! Amazing job!`, 0.82, 1.15);
+        createConfetti();
+    }
+
+    function createConfetti() {
+        const confColors = COLORS.map(c => c.hex);
+        for (let i = 0; i < 70; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.top  = '-20px';
+            c.style.backgroundColor = confColors[Math.floor(Math.random() * confColors.length)];
+            c.style.animationDelay  = (Math.random() * 2.5) + 's';
+            c.style.borderRadius    = Math.random() > 0.5 ? '50%' : '2px';
+            c.style.width  = (10 + Math.random() * 12) + 'px';
+            c.style.height = (10 + Math.random() * 12) + 'px';
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 4000);
+        }
+    }
+    </script>
+</body>
+</html>
