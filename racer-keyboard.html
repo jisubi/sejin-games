@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Ocean Race!</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
@@ -378,9 +378,149 @@
             0%, 100% { transform: rotate(-5deg); }
             50% { transform: rotate(5deg); }
         }
+
+        /* ===== MOBILE SUPPORT ===== */
+
+        /* Portrait orientation overlay */
+        #rotate-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 30, 60, 0.96);
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: 'Fredoka One', cursive;
+            text-align: center;
+            padding: 20px;
+        }
+        #rotate-overlay .rotate-icon {
+            font-size: 6rem;
+            margin-bottom: 20px;
+            animation: rotateHint 2s ease-in-out infinite;
+        }
+        #rotate-overlay .rotate-msg {
+            font-size: 1.8rem;
+            line-height: 1.5;
+        }
+        @keyframes rotateHint {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        @media (orientation: portrait) and (max-width: 768px) {
+            #rotate-overlay { display: flex; }
+        }
+
+        /* On-screen keyboard for touch devices */
+        #mobile-keyboard {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 500;
+            padding: 6px 4px;
+            background: rgba(0, 40, 80, 0.75);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        @media (hover: none) and (pointer: coarse) {
+            #mobile-keyboard { display: block; }
+        }
+        #mobile-keyboard .kb-row {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        #mobile-keyboard .kb-row:last-child { margin-bottom: 0; }
+        #mobile-keyboard .kb-btn {
+            min-width: 44px;
+            min-height: 44px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.1rem;
+            color: white;
+            background: rgba(255, 255, 255, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            box-shadow: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
+            flex: 1 1 0;
+            max-width: 52px;
+            transition: background 0.08s, transform 0.08s;
+        }
+        #mobile-keyboard .kb-btn:active {
+            background: rgba(0, 188, 212, 0.7);
+            transform: scale(0.9);
+        }
+
+        /* Adjust game layout when mobile keyboard is visible */
+        @media (hover: none) and (pointer: coarse) {
+            #track {
+                bottom: 160px;
+            }
+            #question-popup {
+                padding: 25px 35px;
+                border-radius: 25px;
+            }
+            #question-char {
+                font-size: 5rem;
+                margin: 10px 0;
+            }
+            #question-text {
+                font-size: 1.4rem;
+            }
+            #hud {
+                padding: 8px 25px;
+                font-size: 1.2rem;
+                top: 8px;
+            }
+            .swimmer { font-size: 45px; }
+            .swimmer.player { font-size: 55px; }
+            .player-label { font-size: 0.7rem; padding: 3px 8px; top: -55px; }
+            .player-arrow { font-size: 25px; top: -35px; }
+            .progress-bar { width: 35px; height: 35px; font-size: 1rem; }
+            h1 { font-size: 3rem; }
+            .subtitle { font-size: 1.3rem; }
+            button { padding: 15px 40px; font-size: 1.8rem; }
+            .home-btn { padding: 12px 25px; font-size: 1.3rem; }
+            .character-option { padding: 12px 15px; min-width: 80px; }
+            .char-emoji { font-size: 2.8rem; }
+            .char-name { font-size: 0.9rem; }
+            .character-select { gap: 10px; }
+            #feedback { font-size: 5rem; }
+            .winner-swimmer { font-size: 6rem; }
+            #winner-text { font-size: 1.6rem; }
+        }
+
+        /* Responsive canvas scaling for various screen sizes */
+        @media (max-height: 500px) {
+            #track { top: 8%; bottom: 8%; }
+            #hud { padding: 5px 20px; font-size: 1rem; top: 4px; }
+            .swimmer { font-size: 35px; }
+            .swimmer.player { font-size: 45px; }
+            .progress-bar { width: 30px; height: 30px; font-size: 0.9rem; }
+            #finish-line { right: 60px; width: 18px; }
+        }
     </style>
 </head>
 <body>
+    <!-- Rotate device overlay (portrait mobile only) -->
+    <div id="rotate-overlay">
+        <div class="rotate-icon">📱</div>
+        <div class="rotate-msg">Please rotate your device<br>to landscape mode!</div>
+    </div>
+
     <div id="game-container">
         <!-- Bubbles -->
         <div id="bubbles"></div>
@@ -798,6 +938,60 @@
         // Initialize decorations
         createBubbles();
         createSeaweed();
+
+        // ===== MOBILE ON-SCREEN KEYBOARD =====
+        (function() {
+            const KB_ROWS = [
+                'QWERTYUIOP'.split(''),
+                'ASDFGHJKL'.split(''),
+                'ZXCVBNM'.split(''),
+                '1234567890'.split('')
+            ];
+
+            const kb = document.createElement('div');
+            kb.id = 'mobile-keyboard';
+
+            KB_ROWS.forEach(function(row) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'kb-row';
+                row.forEach(function(ch) {
+                    const btn = document.createElement('button');
+                    btn.className = 'kb-btn';
+                    btn.textContent = ch;
+                    btn.setAttribute('data-key', ch);
+                    btn.type = 'button';
+                    rowDiv.appendChild(btn);
+                });
+                kb.appendChild(rowDiv);
+            });
+
+            document.body.appendChild(kb);
+
+            // Dispatch key events when mobile buttons are tapped
+            kb.addEventListener('pointerdown', function(e) {
+                const btn = e.target.closest('.kb-btn');
+                if (!btn) return;
+                e.preventDefault(); // prevent focus loss / scroll
+
+                const key = btn.getAttribute('data-key');
+                if (!key) return;
+
+                // Fire the same keydown event desktop uses
+                document.dispatchEvent(new KeyboardEvent('keydown', {
+                    key: key,
+                    code: 'Key' + key,
+                    bubbles: true,
+                    cancelable: true
+                }));
+            });
+
+            // Prevent double-tap zoom on keyboard area
+            kb.addEventListener('touchstart', function(e) {
+                if (e.target.closest('.kb-btn')) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        })();
     </script>
 </body>
 </html>

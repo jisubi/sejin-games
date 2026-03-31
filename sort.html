@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Animal Sort!</title>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
 <style>
@@ -17,6 +17,7 @@
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
+    touch-action: manipulation;
   }
 
   /* ---- START SCREEN ---- */
@@ -201,7 +202,7 @@
     border-top: 4px solid rgba(255,255,255,0.5);
   }
   .habitat:hover { filter: brightness(1.08); transform: scale(1.02); z-index: 2; }
-  .habitat:active { transform: scale(0.97); }
+  .habitat:active { transform: scale(0.97); opacity: 0.75; }
 
   /* Sky */
   #zone-sky {
