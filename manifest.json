@@ -2,7 +2,7 @@
   "name": "Sejin's Games",
   "short_name": "Sejin Games",
   "description": "Fun educational games for kids!",
-  "start_url": "/games.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#667eea",
   "theme_color": "#667eea",
