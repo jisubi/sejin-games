@@ -373,6 +373,173 @@
             z-index: 50;
             pointer-events: auto;
         }
+
+        /* ===== TRASH CAN ===== */
+        .trash-can {
+            width: 28px;
+            height: 34px;
+            position: relative;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s;
+        }
+
+        .trash-can:active {
+            transform: scale(0.9);
+        }
+
+        .can-body {
+            position: absolute;
+            bottom: 0;
+            left: 2px;
+            right: 2px;
+            height: 24px;
+            background: var(--can-color, #4CAF50);
+            border-radius: 0 0 4px 4px;
+            transition: background 0.5s;
+        }
+
+        .can-body::before,
+        .can-body::after {
+            content: '';
+            position: absolute;
+            left: 3px;
+            right: 3px;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 1px;
+        }
+
+        .can-body::before {
+            top: 6px;
+        }
+
+        .can-body::after {
+            top: 12px;
+        }
+
+        .can-lid {
+            position: absolute;
+            top: 4px;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: var(--can-color, #4CAF50);
+            border-radius: 3px 3px 0 0;
+            transition: background 0.5s;
+        }
+
+        .can-lid::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 4px;
+            background: var(--can-color, #4CAF50);
+            border-radius: 3px 3px 0 0;
+            transition: background 0.5s;
+        }
+
+        .can-handle-l,
+        .can-handle-r {
+            position: absolute;
+            top: 14px;
+            width: 3px;
+            height: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 1px;
+        }
+
+        .can-handle-l {
+            left: -1px;
+        }
+
+        .can-handle-r {
+            right: -1px;
+        }
+
+        .stink-lines {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 3px;
+        }
+
+        .stink-lines.visible {
+            display: flex;
+        }
+
+        .stink-line {
+            width: 2px;
+            height: 10px;
+            background: #8D6E63;
+            border-radius: 1px;
+            animation: stinkWave 0.8s ease-in-out infinite;
+            opacity: 0.7;
+        }
+
+        .stink-line:nth-child(2) {
+            animation-delay: 0.2s;
+            height: 14px;
+        }
+
+        .stink-line:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes stinkWave {
+            0%, 100% { transform: translateY(0) scaleY(1); opacity: 0.7; }
+            50%       { transform: translateY(-4px) scaleY(1.2); opacity: 1; }
+        }
+
+        .fly {
+            position: absolute;
+            font-size: 10px;
+            animation: flyBuzz 1.2s ease-in-out infinite;
+            display: none;
+        }
+
+        .fly.visible {
+            display: block;
+        }
+
+        .fly:first-of-type {
+            top: -18px;
+            left: -5px;
+        }
+
+        .fly:last-of-type {
+            top: -14px;
+            right: -8px;
+            animation-delay: 0.6s;
+        }
+
+        @keyframes flyBuzz {
+            0%,  100% { transform: translate(0, 0); }
+            25%        { transform: translate(4px, -3px); }
+            50%        { transform: translate(-2px, -5px); }
+            75%        { transform: translate(-4px, -1px); }
+        }
+
+        .points-popup {
+            position: fixed;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.2rem;
+            color: #FFD700;
+            text-shadow: 2px 2px #333;
+            z-index: 200;
+            pointer-events: none;
+            animation: popUp 0.8s ease-out forwards;
+        }
+
+        @keyframes popUp {
+            0%   { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.3); }
+        }
     </style>
 </head>
 <body>
@@ -599,9 +766,147 @@
             canvas.height = neighborhood.clientHeight;
         }
 
+        // ===== TRASH SYSTEM =====
+        var allTrashCans = [];
+        var trashIdCounter = 0;
+        var spawnTimer = null;
+        var decayInterval = null;
+        var gameRunning = false;
+        var gameStartTime = 0;
+
+        function createTrashCan(house) {
+            var id = trashIdCounter++;
+            var el = document.createElement('div');
+            el.className = 'trash-can';
+            el.dataset.trashId = id;
+            el.style.setProperty('--can-color', '#4CAF50');
+
+            var lid = document.createElement('div');
+            lid.className = 'can-lid';
+            el.appendChild(lid);
+
+            var body = document.createElement('div');
+            body.className = 'can-body';
+            el.appendChild(body);
+
+            var handleL = document.createElement('div');
+            handleL.className = 'can-handle-l';
+            el.appendChild(handleL);
+
+            var handleR = document.createElement('div');
+            handleR.className = 'can-handle-r';
+            el.appendChild(handleR);
+
+            var stinkLines = document.createElement('div');
+            stinkLines.className = 'stink-lines';
+            for (var s = 0; s < 3; s++) {
+                var line = document.createElement('div');
+                line.className = 'stink-line';
+                stinkLines.appendChild(line);
+            }
+            el.appendChild(stinkLines);
+
+            var fly1 = document.createElement('div');
+            fly1.className = 'fly';
+            fly1.textContent = '\uD83E\uDEB0'; // fly emoji
+            el.appendChild(fly1);
+
+            var fly2 = document.createElement('div');
+            fly2.className = 'fly';
+            fly2.textContent = '\uD83E\uDEB0';
+            el.appendChild(fly2);
+
+            el.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                onTrashTap(id);
+            });
+
+            house.trashZone.appendChild(el);
+
+            var trashObj = { id: id, house: house, element: el, spawnTime: Date.now(), collected: false };
+            allTrashCans.push(trashObj);
+            house.trashCans.push(trashObj);
+            return trashObj;
+        }
+
+        function getFreshness(trashCan) {
+            var age = Date.now() - trashCan.spawnTime;
+            for (var i = 0; i < FRESHNESS.length; i++) {
+                if (age < FRESHNESS[i].maxAge) return FRESHNESS[i];
+            }
+            return FRESHNESS[FRESHNESS.length - 1];
+        }
+
+        function updateTrashVisuals() {
+            for (var i = 0; i < allTrashCans.length; i++) {
+                var tc = allTrashCans[i];
+                if (tc.collected) continue;
+                var f = getFreshness(tc);
+                tc.element.style.setProperty('--can-color', f.color);
+
+                var stinkLines = tc.element.querySelector('.stink-lines');
+                var flies = tc.element.querySelectorAll('.fly');
+                if (f.name === 'stinky' || f.name === 'rotten') {
+                    stinkLines.classList.add('visible');
+                } else {
+                    stinkLines.classList.remove('visible');
+                }
+                if (f.name === 'rotten') {
+                    flies[0].classList.add('visible');
+                    flies[1].classList.add('visible');
+                } else {
+                    flies[0].classList.remove('visible');
+                    flies[1].classList.remove('visible');
+                }
+            }
+        }
+
+        function spawnTrash() {
+            var config = DIFFICULTIES[selectedDifficulty];
+            var available = houses.filter(function(h) {
+                return h.trashCans.filter(function(t) { return !t.collected; }).length < config.maxTrash;
+            });
+            if (available.length === 0) return;
+            var house = available[Math.floor(Math.random() * available.length)];
+            createTrashCan(house);
+        }
+
+        function scheduleNextSpawn() {
+            if (!gameRunning) return;
+            var config = DIFFICULTIES[selectedDifficulty];
+            var elapsed = Date.now() - gameStartTime;
+            var progress = Math.min(elapsed / GAME_DURATION, 1);
+            var interval = config.spawnStart + (config.spawnEnd - config.spawnStart) * progress;
+            spawnTimer = setTimeout(function() {
+                spawnTrash();
+                scheduleNextSpawn();
+            }, interval);
+        }
+
+        function onTrashTap(trashId) {
+            // Placeholder — wired up in Task 5 (pathfinding + truck movement)
+        }
+
         function startGame() {
+            // Reset state
+            allTrashCans = [];
+            trashIdCounter = 0;
+            gameRunning = true;
+            gameStartTime = Date.now();
+
+            // Show game area and build grid
             document.getElementById('game-area').style.display = 'block';
             buildGrid();
+
+            // Start trash spawning after 2s delay
+            setTimeout(function() {
+                if (!gameRunning) return;
+                spawnTrash();
+                scheduleNextSpawn();
+            }, 2000);
+
+            // Start decay visual updates (every 100ms)
+            decayInterval = setInterval(updateTrashVisuals, 100);
         }
     </script>
 
