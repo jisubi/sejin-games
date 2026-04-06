@@ -540,6 +540,33 @@
             0%   { opacity: 1; transform: translateY(0) scale(1); }
             100% { opacity: 0; transform: translateY(-40px) scale(1.3); }
         }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        /* ===== MULTIPLIER FLASH ===== */
+        .multiplier-flash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,215,0,0.25);
+            z-index: 500; pointer-events: none;
+            animation: flashFade 0.8s ease-out forwards;
+        }
+        .multiplier-flash .mult-text {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            font-family: 'Fredoka One', cursive;
+            font-size: 5rem;
+            color: #FFD700;
+            text-shadow: 3px 3px #333;
+            animation: popUp 1s ease-out forwards;
+        }
+        @keyframes flashFade {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
@@ -883,20 +910,577 @@
             }, interval);
         }
 
-        function onTrashTap(trashId) {
-            // Placeholder — wired up in Task 5 (pathfinding + truck movement)
+        // ===== SCORING =====
+        var score = 0;
+        var streak = 0;
+        var multiplier = 1;
+        var highestMultiplier = 1;
+        var trashCollected = 0;
+        var gameTimerInterval = null;
+
+        function getMultiplier() {
+            for (var i = MULTIPLIER_THRESHOLDS.length - 1; i >= 0; i--) {
+                if (streak >= MULTIPLIER_THRESHOLDS[i].streak) return MULTIPLIER_THRESHOLDS[i].multiplier;
+            }
+            return 1;
         }
 
+        function collectTrash(trashCan) {
+            if (trashCan.collected) return;
+            trashCan.collected = true;
+            truckChomp();
+
+            var f = getFreshness(trashCan);
+            var points = f.points * multiplier;
+
+            if (f.stinky) {
+                streak = 0;
+            } else {
+                streak++;
+            }
+            var newMultiplier = getMultiplier();
+            if (newMultiplier > multiplier) {
+                showMultiplierUpgrade(newMultiplier);
+            }
+            if (newMultiplier < multiplier) {
+                showStreakBreak();
+            }
+            multiplier = newMultiplier;
+            if (multiplier > highestMultiplier) highestMultiplier = multiplier;
+
+            score += points;
+            trashCollected++;
+
+            showPointsPopup(trashCan.element, '+' + points, multiplier > 1);
+
+            trashCan.element.style.transition = 'transform 0.2s, opacity 0.2s';
+            trashCan.element.style.transform = 'scale(0)';
+            trashCan.element.style.opacity = '0';
+            setTimeout(function() {
+                if (trashCan.element.parentNode) {
+                    trashCan.element.parentNode.removeChild(trashCan.element);
+                }
+            }, 200);
+
+            var idx = trashCan.house.trashCans.indexOf(trashCan);
+            if (idx > -1) trashCan.house.trashCans.splice(idx, 1);
+
+            updateHUD();
+        }
+
+        function showPointsPopup(anchorEl, text, isMultiplied) {
+            var rect = anchorEl.getBoundingClientRect();
+            var popup = document.createElement('div');
+            popup.className = 'points-popup';
+            popup.textContent = text;
+            if (isMultiplied) popup.style.color = '#FFD700';
+            popup.style.left = rect.left + rect.width / 2 - 20 + 'px';
+            popup.style.top = rect.top + 'px';
+            document.body.appendChild(popup);
+            setTimeout(function() { popup.remove(); }, 800);
+        }
+
+        function showMultiplierUpgrade(newMult) {
+            var flash = document.createElement('div');
+            flash.className = 'multiplier-flash';
+            var txt = document.createElement('div');
+            txt.className = 'mult-text';
+            txt.textContent = newMult + 'x!';
+            flash.appendChild(txt);
+            document.body.appendChild(flash);
+            setTimeout(function() { flash.remove(); }, 1000);
+        }
+
+        function showStreakBreak() {
+            var bar = document.getElementById('streak-bar-wrap');
+            bar.style.animation = 'none';
+            bar.offsetHeight;
+            bar.style.animation = 'shake 0.4s ease';
+        }
+
+        function updateHUD() {
+            document.getElementById('score-value').textContent = score;
+            var multEl = document.getElementById('hud-multiplier');
+            multEl.textContent = multiplier + 'x';
+            multEl.classList.toggle('active', multiplier > 1);
+            document.getElementById('streak-label').textContent = 'Streak: ' + streak;
+
+            var nextThreshold = 10;
+            var barBase = 0;
+            if (streak >= 20) {
+                nextThreshold = 20; barBase = 0;
+            } else if (streak >= 10) {
+                nextThreshold = 20; barBase = 10;
+            }
+            var barProgress = Math.min((streak - barBase) / (nextThreshold - barBase) * 100, 100);
+            if (streak >= 20) barProgress = 100;
+            document.getElementById('streak-bar-fill').style.width = barProgress + '%';
+        }
+
+        // ===== GAME TIMER =====
+        function startGameTimer() {
+            var timerEl = document.getElementById('hud-timer');
+            gameTimerInterval = setInterval(function() {
+                var elapsed = Date.now() - gameStartTime;
+                var remaining = Math.max(0, Math.ceil((GAME_DURATION - elapsed) / 1000));
+                timerEl.textContent = remaining;
+                timerEl.classList.toggle('warning', remaining <= 5);
+                if (remaining <= 0) {
+                    endGame();
+                }
+            }, 100);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameTimerInterval);
+            clearInterval(decayInterval);
+            clearTimeout(spawnTimer);
+            if (truckAnimFrame) cancelAnimationFrame(truckAnimFrame);
+
+            document.getElementById('game-area').style.display = 'none';
+
+            var stars = 1;
+            var theoreticalMax = { easy: 300, medium: 500, hard: 800 };
+            var maxScore = theoreticalMax[selectedDifficulty] || 300;
+            if (score >= maxScore * 0.8) stars = 3;
+            else if (score >= maxScore * 0.5) stars = 2;
+
+            var starStr = '';
+            for (var i = 0; i < 3; i++) starStr += (i < stars ? '\u2B50' : '\u2606');
+
+            document.getElementById('end-score').textContent = score;
+            document.getElementById('end-collected').textContent = trashCollected;
+            document.getElementById('end-streak').textContent = highestMultiplier + 'x';
+
+            // Insert stars before stats
+            var statsEl = document.getElementById('end-stats');
+            var existingStar = document.getElementById('end-stars');
+            if (existingStar) existingStar.remove();
+            var starDiv = document.createElement('div');
+            starDiv.id = 'end-stars';
+            starDiv.style.cssText = 'font-size:3rem;margin-bottom:10px;';
+            starDiv.textContent = starStr;
+            statsEl.parentNode.insertBefore(starDiv, statsEl);
+
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        // ===== TRUCK & PATHFINDING =====
+        var truck = { row: 0, col: 0, x: 0, y: 0, targetX: 0, targetY: 0, direction: 'right', moving: false };
+        var currentRoute = [];
+        var currentRouteIndex = 0;
+        var truckAnimFrame = null;
+        var TRUCK_SPEED = 3;
+        var routePreview = [];
+        var truckChomping = false;
+        var chompTimer = 0;
+
+        function truckChomp() {
+            truckChomping = true;
+            chompTimer = 12;
+        }
+
+        function gridToPixel(gridRow, gridCol) {
+            var container = document.getElementById('grid-container');
+            var rect = container.getBoundingClientRect();
+            var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+            var totalCells = gridSize * 2 - 1;
+            var cellSize = rect.width / totalCells;
+            var pixelX = rect.left - neighborhoodRect.left + (gridCol * 2) * cellSize + cellSize / 2;
+            var pixelY = rect.top - neighborhoodRect.top + (gridRow * 2) * cellSize + cellSize / 2;
+            return { x: pixelX, y: pixelY };
+        }
+
+        function bfsPath(startRow, startCol, endRow, endCol) {
+            if (startRow === endRow && startCol === endCol) return [{ row: endRow, col: endCol }];
+            var visited = {};
+            var queue = [{ row: startRow, col: startCol, path: [{ row: startRow, col: startCol }] }];
+            visited[startRow + ',' + startCol] = true;
+            var dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            while (queue.length > 0) {
+                var current = queue.shift();
+                for (var d = 0; d < dirs.length; d++) {
+                    var nr = current.row + dirs[d][0];
+                    var nc = current.col + dirs[d][1];
+                    if (nr < 0 || nr >= gridSize || nc < 0 || nc >= gridSize) continue;
+                    if (visited[nr + ',' + nc]) continue;
+                    visited[nr + ',' + nc] = true;
+                    var newPath = current.path.concat([{ row: nr, col: nc }]);
+                    if (nr === endRow && nc === endCol) return newPath;
+                    queue.push({ row: nr, col: nc, path: newPath });
+                }
+            }
+            return [];
+        }
+
+        function startRoute(route) {
+            if (route.length < 2) {
+                collectTrashAtPosition(route[0].row, route[0].col);
+                return;
+            }
+            currentRoute = route;
+            currentRouteIndex = 1;
+            truck.moving = true;
+            var nextPos = gridToPixel(currentRoute[1].row, currentRoute[1].col);
+            truck.targetX = nextPos.x;
+            truck.targetY = nextPos.y;
+            updateTruckDirection(currentRoute[1].row - currentRoute[0].row, currentRoute[1].col - currentRoute[0].col);
+        }
+
+        function updateTruckDirection(dr, dc) {
+            if (dc > 0) truck.direction = 'right';
+            else if (dc < 0) truck.direction = 'left';
+            else if (dr > 0) truck.direction = 'down';
+            else if (dr < 0) truck.direction = 'up';
+        }
+
+        function collectTrashAtPosition(row, col) {
+            var house = houses.find(function(h) { return h.row === row && h.col === col; });
+            if (!house) return;
+            for (var i = 0; i < allTrashCans.length; i++) {
+                var tc = allTrashCans[i];
+                if (tc.house === house && !tc.collected) {
+                    collectTrash(tc);
+                    return;
+                }
+            }
+        }
+
+        function getNearestGridRow() {
+            var minDist = Infinity;
+            var nearest = truck.row;
+            for (var r = 0; r < gridSize; r++) {
+                var pos = gridToPixel(r, truck.col);
+                var dist = Math.abs(truck.y - pos.y);
+                if (dist < minDist) { minDist = dist; nearest = r; }
+            }
+            return nearest;
+        }
+
+        function getNearestGridCol() {
+            var minDist = Infinity;
+            var nearest = truck.col;
+            for (var c = 0; c < gridSize; c++) {
+                var pos = gridToPixel(truck.row, c);
+                var dist = Math.abs(truck.x - pos.x);
+                if (dist < minDist) { minDist = dist; nearest = c; }
+            }
+            return nearest;
+        }
+
+        function truckAnimationLoop() {
+            if (!gameRunning) return;
+
+            var canvas = document.getElementById('canvas-overlay');
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (truck.moving && currentRoute.length > 0) {
+                var dx = truck.targetX - truck.x;
+                var dy = truck.targetY - truck.y;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < TRUCK_SPEED) {
+                    truck.x = truck.targetX;
+                    truck.y = truck.targetY;
+                    truck.row = currentRoute[currentRouteIndex].row;
+                    truck.col = currentRoute[currentRouteIndex].col;
+
+                    collectTrashAtPosition(truck.row, truck.col);
+
+                    currentRouteIndex++;
+                    if (currentRouteIndex < currentRoute.length) {
+                        var nextPos = gridToPixel(currentRoute[currentRouteIndex].row, currentRoute[currentRouteIndex].col);
+                        truck.targetX = nextPos.x;
+                        truck.targetY = nextPos.y;
+                        var prev = currentRoute[currentRouteIndex - 1];
+                        var curr = currentRoute[currentRouteIndex];
+                        updateTruckDirection(curr.row - prev.row, curr.col - prev.col);
+                    } else {
+                        truck.moving = false;
+                        currentRoute = [];
+                    }
+                } else {
+                    truck.x += (dx / dist) * TRUCK_SPEED;
+                    truck.y += (dy / dist) * TRUCK_SPEED;
+                }
+            }
+
+            // Draw route preview (dashed yellow line)
+            if (routePreview.length > 1) {
+                ctx.strokeStyle = 'rgba(255, 235, 59, 0.7)';
+                ctx.lineWidth = 6;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.setLineDash([8, 6]);
+                ctx.beginPath();
+                var first = gridToPixel(routePreview[0].row, routePreview[0].col);
+                ctx.moveTo(first.x, first.y);
+                for (var i = 1; i < routePreview.length; i++) {
+                    var pt = gridToPixel(routePreview[i].row, routePreview[i].col);
+                    ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw trash indicators on route
+                for (var rp = 0; rp < routePreview.length; rp++) {
+                    var rpPos = routePreview[rp];
+                    var rpHouse = houses.find(function(h) { return h.row === rpPos.row && h.col === rpPos.col; });
+                    if (rpHouse && rpHouse.trashCans.some(function(t) { return !t.collected; })) {
+                        var indicator = gridToPixel(rpPos.row, rpPos.col);
+                        ctx.beginPath();
+                        ctx.arc(indicator.x, indicator.y - 20, 8, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255, 235, 59, 0.8)';
+                        ctx.fill();
+                        ctx.strokeStyle = '#F57F17';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.fillStyle = '#333';
+                        ctx.font = 'bold 10px Fredoka One, cursive';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('\u2713', indicator.x, indicator.y - 20);
+                    }
+                }
+            }
+
+            // Draw truck
+            drawTruck(ctx, truck.x, truck.y, truck.direction);
+
+            truckAnimFrame = requestAnimationFrame(truckAnimationLoop);
+        }
+
+        function drawTruck(ctx, x, y, direction) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            var angle = 0;
+            if (direction === 'right') angle = 0;
+            else if (direction === 'down') angle = Math.PI / 2;
+            else if (direction === 'left') angle = Math.PI;
+            else if (direction === 'up') angle = -Math.PI / 2;
+            ctx.rotate(angle);
+
+            var w = 36, h = 24;
+
+            // Garbage section
+            ctx.fillStyle = '#43A047';
+            ctx.fillRect(-w / 2, -h / 2, w * 0.65, h);
+            ctx.strokeStyle = '#2E7D32';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-w / 2, -h / 2, w * 0.65, h);
+
+            // Chomp animation: lid opens when collecting
+            if (truckChomping && chompTimer > 6) {
+                ctx.fillStyle = '#2E7D32';
+                ctx.fillRect(-w / 2, -h / 2 - 6, w * 0.65, 5);
+            }
+
+            // Cab
+            ctx.fillStyle = '#66BB6A';
+            ctx.fillRect(-w / 2 + w * 0.65, -h / 2 + 2, w * 0.35, h - 4);
+            ctx.strokeStyle = '#2E7D32';
+            ctx.strokeRect(-w / 2 + w * 0.65, -h / 2 + 2, w * 0.35, h - 4);
+
+            // Windshield
+            ctx.fillStyle = '#BBDEFB';
+            ctx.fillRect(-w / 2 + w * 0.72, -h / 2 + 5, w * 0.2, h - 10);
+
+            // Wheels
+            ctx.fillStyle = '#333';
+            ctx.beginPath(); ctx.arc(-w / 2 + 8, h / 2 + 1, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-w / 2 + w * 0.55, h / 2 + 1, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w / 2 - 5, h / 2 + 1, 3, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+
+            if (truckChomping) {
+                chompTimer--;
+                if (chompTimer <= 0) truckChomping = false;
+            }
+        }
+
+        // ===== TAP-TO-COLLECT =====
+        function onTrashTap(trashId) {
+            if (!gameRunning) return;
+            var trashCan = allTrashCans.find(function(t) { return t.id === trashId; });
+            if (!trashCan || trashCan.collected) return;
+
+            var targetRow = trashCan.house.row;
+            var targetCol = trashCan.house.col;
+
+            // Snap truck to nearest grid point (cancel current route)
+            truck.row = getNearestGridRow();
+            truck.col = getNearestGridCol();
+            var snapPos = gridToPixel(truck.row, truck.col);
+            truck.x = snapPos.x;
+            truck.y = snapPos.y;
+
+            var path = bfsPath(truck.row, truck.col, targetRow, targetCol);
+            if (path.length > 0) {
+                startRoute(path);
+            }
+        }
+
+        // ===== DRAG-TO-ROUTE =====
+        var isDragging = false;
+
+        function getGridPosFromPixel(px, py) {
+            var container = document.getElementById('grid-container');
+            var rect = container.getBoundingClientRect();
+            var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+            var totalCells = gridSize * 2 - 1;
+            var cellSize = rect.width / totalCells;
+
+            var relX = px - (rect.left - neighborhoodRect.left);
+            var relY = py - (rect.top - neighborhoodRect.top);
+
+            var col = Math.round(relX / cellSize / 2);
+            var row = Math.round(relY / cellSize / 2);
+            col = Math.max(0, Math.min(gridSize - 1, col));
+            row = Math.max(0, Math.min(gridSize - 1, row));
+            return { row: row, col: col };
+        }
+
+        function isAdjacent(a, b) {
+            return (Math.abs(a.row - b.row) + Math.abs(a.col - b.col)) === 1;
+        }
+
+        function addToRoutePreview(gridPos) {
+            if (routePreview.length === 0) {
+                routePreview.push(gridPos);
+                return;
+            }
+            var last = routePreview[routePreview.length - 1];
+            if (last.row === gridPos.row && last.col === gridPos.col) return;
+
+            // Check backtracking
+            for (var i = 0; i < routePreview.length - 1; i++) {
+                if (routePreview[i].row === gridPos.row && routePreview[i].col === gridPos.col) {
+                    routePreview = routePreview.slice(0, i + 1);
+                    return;
+                }
+            }
+
+            // Fill gap if not adjacent
+            if (!isAdjacent(last, gridPos)) {
+                var fillPath = bfsPath(last.row, last.col, gridPos.row, gridPos.col);
+                for (var j = 1; j < fillPath.length; j++) {
+                    var exists = false;
+                    for (var k = 0; k < routePreview.length; k++) {
+                        if (routePreview[k].row === fillPath[j].row && routePreview[k].col === fillPath[j].col) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) routePreview.push(fillPath[j]);
+                }
+                return;
+            }
+
+            routePreview.push(gridPos);
+        }
+
+        function setupDragListeners() {
+            var canvas = document.getElementById('canvas-overlay');
+
+            canvas.addEventListener('pointerdown', function(e) {
+                if (!gameRunning) return;
+                isDragging = true;
+                routePreview = [];
+
+                var snapRow = getNearestGridRow();
+                var snapCol = getNearestGridCol();
+                routePreview.push({ row: snapRow, col: snapCol });
+
+                var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+                var pos = getGridPosFromPixel(e.clientX - neighborhoodRect.left, e.clientY - neighborhoodRect.top);
+                addToRoutePreview(pos);
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointermove', function(e) {
+                if (!isDragging || !gameRunning) return;
+                var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+                var pos = getGridPosFromPixel(e.clientX - neighborhoodRect.left, e.clientY - neighborhoodRect.top);
+                addToRoutePreview(pos);
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointerup', function(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                if (routePreview.length >= 2 && gameRunning) {
+                    truck.row = getNearestGridRow();
+                    truck.col = getNearestGridCol();
+                    var snapPos = gridToPixel(truck.row, truck.col);
+                    truck.x = snapPos.x;
+                    truck.y = snapPos.y;
+
+                    var fullRoute = [{ row: truck.row, col: truck.col }];
+                    for (var i = 1; i < routePreview.length; i++) {
+                        if (routePreview[i].row !== fullRoute[fullRoute.length - 1].row ||
+                            routePreview[i].col !== fullRoute[fullRoute.length - 1].col) {
+                            fullRoute.push(routePreview[i]);
+                        }
+                    }
+                    startRoute(fullRoute);
+                }
+                routePreview = [];
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointercancel', function() {
+                isDragging = false;
+                routePreview = [];
+            });
+        }
+
+        // ===== START GAME =====
         function startGame() {
-            // Reset state
+            // Reset all state
             allTrashCans = [];
             trashIdCounter = 0;
+            score = 0;
+            streak = 0;
+            multiplier = 1;
+            highestMultiplier = 1;
+            trashCollected = 0;
             gameRunning = true;
             gameStartTime = Date.now();
+            currentRoute = [];
+            routePreview = [];
+            isDragging = false;
+
+            // Reset HUD
+            updateHUD();
+            document.getElementById('hud-timer').textContent = '30';
+            document.getElementById('hud-timer').classList.remove('warning');
 
             // Show game area and build grid
             document.getElementById('game-area').style.display = 'block';
             buildGrid();
+
+            // Initialize truck at bottom-left
+            truck.row = gridSize - 1;
+            truck.col = 0;
+            truck.moving = false;
+            truck.direction = 'right';
+            var startPos = gridToPixel(truck.row, truck.col);
+            truck.x = startPos.x;
+            truck.y = startPos.y;
+
+            // Set up drag listeners
+            setupDragListeners();
+
+            // Start animation loop
+            if (truckAnimFrame) cancelAnimationFrame(truckAnimFrame);
+            truckAnimationLoop();
+
+            // Start timer
+            startGameTimer();
 
             // Start trash spawning after 2s delay
             setTimeout(function() {
@@ -905,7 +1489,7 @@
                 scheduleNextSpawn();
             }, 2000);
 
-            // Start decay visual updates (every 100ms)
+            // Start decay visual updates
             decayInterval = setInterval(updateTrashVisuals, 100);
         }
     </script>
