@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2d5016">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Trash Truck!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(135deg, #2d5016, #1a7a4a);
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* ===== PORTRAIT WARNING ===== */
+        #portrait-warning {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            flex-direction: column; justify-content: center; align-items: center;
+            color: white; text-align: center; padding: 20px;
+        }
+
+        @media (orientation: portrait) and (max-width: 900px) {
+            #portrait-warning { display: flex; }
+        }
+
+        #portrait-warning .phone-icon {
+            font-size: 5rem;
+            animation: rotatePhone 1.5s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes rotatePhone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+
+        #portrait-warning p {
+            font-size: 1.5rem;
+            color: #FFD700;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        /* ===== OVERLAYS ===== */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.88);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 600; color: white; text-align: center; padding: 20px;
+        }
+
+        .overlay.hidden { display: none; }
+
+        .overlay h1 {
+            font-size: 3.5rem;
+            color: #FFD700;
+            text-shadow: 3px 3px #333;
+            margin-bottom: 10px;
+        }
+
+        .overlay .sub {
+            font-size: 1.3rem;
+            color: #fff;
+            margin-bottom: 24px;
+            opacity: 0.9;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        .overlay button {
+            padding: 18px 50px;
+            font-size: 2rem;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 6px #2d6a2f;
+            transition: all 0.1s;
+        }
+
+        .overlay button:active {
+            box-shadow: 0 3px #2d6a2f;
+            transform: translateY(3px);
+        }
+
+        /* ===== DIFFICULTY SELECTOR ===== */
+        .diff-selector {
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 28px;
+        }
+
+        .diff-btn {
+            padding: 15px 30px;
+            font-size: 1.3rem;
+            font-family: 'Fredoka One', cursive;
+            border: 4px solid transparent;
+            border-radius: 15px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.15s;
+        }
+
+        .diff-btn[data-diff="easy"]   { background: #4CAF50; }
+        .diff-btn[data-diff="medium"] { background: #FF9800; }
+        .diff-btn[data-diff="hard"]   { background: #f44336; }
+
+        .diff-btn.selected {
+            border-color: #FFD700;
+            transform: scale(1.1);
+            box-shadow: 0 0 16px rgba(255, 215, 0, 0.7);
+        }
+
+        .diff-btn .diff-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        /* ===== COUNTDOWN SCREEN ===== */
+        #countdown-text {
+            font-size: 8rem;
+            color: #FFD700;
+            text-shadow: 4px 4px #333;
+        }
+
+        /* ===== END SCREEN STATS ===== */
+        #end-stats {
+            font-size: 1.4rem;
+            color: #fff;
+            margin-bottom: 28px;
+            line-height: 2;
+        }
+
+        #end-stats span {
+            color: #FFD700;
+        }
+
+        .end-btn-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn-home {
+            padding: 18px 50px;
+            font-size: 2rem;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #FF9800, #e68900);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 6px #b56800;
+            transition: all 0.1s;
+        }
+
+        .btn-home:active {
+            box-shadow: 0 3px #b56800;
+            transform: translateY(3px);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Portrait Warning -->
+    <div id="portrait-warning">
+        <div class="phone-icon">&#x1F4F1;</div>
+        <p>Please rotate your device!</p>
+    </div>
+
+    <!-- Start Screen -->
+    <div class="overlay" id="start-screen">
+        <h1>&#x1F69B; Trash Truck!</h1>
+        <p class="sub">Drive your trash truck around the neighborhood! Pick up all the garbage before it gets too stinky. Tap the trash to collect it!</p>
+        <div class="diff-selector">
+            <button class="diff-btn selected" data-diff="easy" onclick="selectDifficulty('easy')">
+                Easy
+                <span class="diff-label">3x3 grid &middot; slow</span>
+            </button>
+            <button class="diff-btn" data-diff="medium" onclick="selectDifficulty('medium')">
+                Medium
+                <span class="diff-label">4x4 grid &middot; normal</span>
+            </button>
+            <button class="diff-btn" data-diff="hard" onclick="selectDifficulty('hard')">
+                Hard
+                <span class="diff-label">5x5 grid &middot; fast</span>
+            </button>
+        </div>
+        <button onclick="startCountdown()">PLAY &#x25B6;</button>
+    </div>
+
+    <!-- Countdown Screen -->
+    <div class="overlay hidden" id="countdown-screen">
+        <div id="countdown-text">3</div>
+    </div>
+
+    <!-- End Screen -->
+    <div class="overlay hidden" id="end-screen">
+        <h1>&#x23F0; Time's Up!</h1>
+        <div id="end-stats">
+            Score: <span id="end-score">0</span><br>
+            Trash Collected: <span id="end-collected">0</span><br>
+            Best Streak: <span id="end-streak">0</span>
+        </div>
+        <div class="end-btn-row">
+            <button onclick="startCountdown()">PLAY AGAIN &#x25B6;</button>
+            <button class="btn-home" onclick="window.location.href='games.html'">&#x1F3E0; HOME</button>
+        </div>
+    </div>
+
+    <script>
+        // Game config
+        var DIFFICULTIES = {
+            easy:   { grid: 3, maxTrash: 1, spawnStart: 4000, spawnEnd: 2000 },
+            medium: { grid: 4, maxTrash: 2, spawnStart: 3000, spawnEnd: 1500 },
+            hard:   { grid: 5, maxTrash: 3, spawnStart: 2000, spawnEnd: 1000 }
+        };
+        var FRESHNESS = [
+            { name: 'fresh',   maxAge: 4000,     color: '#4CAF50', points: 10, stinky: false },
+            { name: 'warming', maxAge: 7000,     color: '#FFC107', points: 7,  stinky: false },
+            { name: 'stinky',  maxAge: 10000,    color: '#FF9800', points: 4,  stinky: true },
+            { name: 'rotten',  maxAge: Infinity, color: '#f44336', points: 1,  stinky: true }
+        ];
+        var GAME_DURATION = 30000;
+        var MULTIPLIER_THRESHOLDS = [
+            { streak: 10, multiplier: 2 },
+            { streak: 20, multiplier: 3 }
+        ];
+
+        var selectedDifficulty = 'easy';
+
+        function selectDifficulty(diff) {
+            selectedDifficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(function(b) {
+                b.classList.toggle('selected', b.dataset.diff === diff);
+            });
+        }
+
+        function startCountdown() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            var countdownScreen = document.getElementById('countdown-screen');
+            var countdownText = document.getElementById('countdown-text');
+            countdownScreen.classList.remove('hidden');
+            var count = 3;
+            countdownText.textContent = count;
+            var interval = setInterval(function() {
+                count--;
+                if (count > 0) {
+                    countdownText.textContent = count;
+                } else if (count === 0) {
+                    countdownText.textContent = 'GO!';
+                } else {
+                    clearInterval(interval);
+                    countdownScreen.classList.add('hidden');
+                    startGame();
+                }
+            }, 700);
+        }
+
+        function startGame() {
+            // Placeholder — implemented in later tasks
+        }
+    </script>
+
+</body>
+</html>
