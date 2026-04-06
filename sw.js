@@ -19,13 +19,14 @@ var urlsToCache = [
   '/icons/icon-512.png'
 ];
 
-// Install - cache all game files
+// Install - cache all game files and skip waiting
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
       return cache.addAll(urlsToCache);
     })
   );
+  self.skipWaiting();
 });
 
 // Fetch - serve from cache, fall back to network
@@ -50,7 +51,7 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-// Activate - clean up old caches
+// Activate - clean up old caches and take control immediately
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(cacheNames) {
@@ -61,6 +62,8 @@ self.addEventListener('activate', function(event) {
           return caches.delete(name);
         })
       );
+    }).then(function() {
+      return self.clients.claim();
     })
   );
 });
