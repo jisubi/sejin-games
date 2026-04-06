@@ -182,6 +182,197 @@
             box-shadow: 0 3px #b56800;
             transform: translateY(3px);
         }
+
+        /* ===== GAME AREA ===== */
+        #game-area {
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            position: relative;
+        }
+
+        /* ===== HUD ===== */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 55px;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 100;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        #hud-score {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #hud-multiplier {
+            background: #616161;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        #hud-multiplier.active {
+            background: #FFD700;
+            color: #333;
+        }
+
+        #hud-timer {
+            font-size: 2rem;
+            text-align: center;
+            min-width: 60px;
+        }
+
+        #hud-timer.warning {
+            color: #f44336;
+            animation: hotPulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes hotPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.8; }
+        }
+
+        #hud-streak {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #streak-bar-wrap {
+            width: 100px;
+            height: 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 7px;
+            overflow: hidden;
+        }
+
+        #streak-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #FFD700, #FF8F00);
+            border-radius: 7px;
+            transition: width 0.2s ease;
+        }
+
+        /* ===== NEIGHBORHOOD ===== */
+        #neighborhood {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #grid-container {
+            display: grid;
+        }
+
+        /* ===== HOUSE CELLS ===== */
+        .house-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .house {
+            width: 80%;
+            height: 60%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .house-roof {
+            width: 0;
+            height: 0;
+            border-left: 40% solid transparent;
+            border-right: 40% solid transparent;
+            border-bottom: 30px solid var(--roof-color);
+            position: relative;
+        }
+
+        .house-body {
+            width: 80%;
+            height: 55px;
+            background: var(--house-color);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .house-door {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 18px;
+            height: 26px;
+            background: #5D4037;
+            border-radius: 3px 3px 0 0;
+        }
+
+        .house-window {
+            position: absolute;
+            top: 10px;
+            width: 14px;
+            height: 14px;
+            background: #BBDEFB;
+            border: 2px solid #90CAF9;
+            border-radius: 2px;
+        }
+
+        .house-window.left  { left: 8px; }
+        .house-window.right { right: 8px; }
+
+        /* ===== ROAD CELLS ===== */
+        .road-cell {
+            background: #9e9e9e;
+        }
+
+        /* ===== TRASH ZONE ===== */
+        .trash-zone {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        /* ===== CANVAS OVERLAY ===== */
+        #canvas-overlay {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            z-index: 50;
+            pointer-events: auto;
+        }
     </style>
 </head>
 <body>
@@ -230,6 +421,20 @@
             <button onclick="startCountdown()">PLAY AGAIN &#x25B6;</button>
             <button class="btn-home" onclick="window.location.href='games.html'">&#x1F3E0; HOME</button>
         </div>
+    </div>
+
+    <div id="game-area">
+        <div id="hud">
+            <div id="hud-score">Score: <span id="score-value">0</span> <span id="hud-multiplier">1x</span></div>
+            <div id="hud-timer">30</div>
+            <div id="hud-streak"><span id="streak-label">Streak: 0</span>
+                <div id="streak-bar-wrap"><div id="streak-bar-fill"></div></div>
+            </div>
+        </div>
+        <div id="neighborhood">
+            <div id="grid-container"></div>
+        </div>
+        <canvas id="canvas-overlay"></canvas>
     </div>
 
     <script>
@@ -282,8 +487,121 @@
             }, 700);
         }
 
+        // ===== GRID / HOUSE CONSTANTS =====
+        var HOUSE_COLORS = ['#e57373','#64B5F6','#81C784','#FFB74D','#BA68C8','#4DB6AC','#FF8A65','#A1887F','#90A4AE'];
+        var ROOF_COLORS  = ['#c62828','#1565C0','#2E7D32','#E65100','#6A1B9A','#00695C','#D84315','#4E342E','#37474F'];
+
+        var gridSize  = 3;
+        var houses    = [];
+        var truckPos  = { row: 0, col: 0 };
+
+        function buildGrid() {
+            var diff = DIFFICULTIES[selectedDifficulty];
+            gridSize = diff.grid;
+
+            houses = [];
+
+            var neighborhood  = document.getElementById('neighborhood');
+            var gridContainer = document.getElementById('grid-container');
+
+            // Clear container safely (no innerHTML)
+            while (gridContainer.firstChild) {
+                gridContainer.removeChild(gridContainer.firstChild);
+            }
+
+            var availWidth  = neighborhood.clientWidth;
+            var availHeight = neighborhood.clientHeight;
+            var totalCells  = gridSize * 2 - 1;
+            var cellSize    = Math.floor(Math.min(availWidth / totalCells, availHeight / totalCells, 120));
+
+            gridContainer.style.gridTemplateColumns = 'repeat(' + totalCells + ', ' + cellSize + 'px)';
+            gridContainer.style.gridTemplateRows    = 'repeat(' + totalCells + ', ' + cellSize + 'px)';
+
+            var houseIndex = 0;
+
+            for (var r = 0; r < totalCells; r++) {
+                for (var c = 0; c < totalCells; c++) {
+                    var cell = document.createElement('div');
+                    cell.style.width  = cellSize + 'px';
+                    cell.style.height = cellSize + 'px';
+
+                    if (r % 2 === 0 && c % 2 === 0) {
+                        // House cell
+                        cell.className = 'house-cell';
+
+                        var colorIdx = houseIndex % HOUSE_COLORS.length;
+
+                        // House wrapper
+                        var house = document.createElement('div');
+                        house.className = 'house';
+                        house.style.setProperty('--house-color', HOUSE_COLORS[colorIdx]);
+                        house.style.setProperty('--roof-color',  ROOF_COLORS[colorIdx]);
+
+                        // Roof
+                        var roof = document.createElement('div');
+                        roof.className = 'house-roof';
+                        var roofHalf = Math.round(cellSize * 0.16);
+                        roof.style.borderLeftWidth   = roofHalf + 'px';
+                        roof.style.borderRightWidth  = roofHalf + 'px';
+                        roof.style.borderBottomWidth = Math.round(cellSize * 0.22) + 'px';
+
+                        // Body
+                        var body = document.createElement('div');
+                        body.className = 'house-body';
+                        body.style.height = Math.round(cellSize * 0.38) + 'px';
+
+                        // Door
+                        var door = document.createElement('div');
+                        door.className = 'house-door';
+
+                        // Windows
+                        var winL = document.createElement('div');
+                        winL.className = 'house-window left';
+
+                        var winR = document.createElement('div');
+                        winR.className = 'house-window right';
+
+                        body.appendChild(winL);
+                        body.appendChild(winR);
+                        body.appendChild(door);
+                        house.appendChild(roof);
+                        house.appendChild(body);
+                        cell.appendChild(house);
+
+                        // Trash zone
+                        var trashZone = document.createElement('div');
+                        trashZone.className = 'trash-zone';
+                        cell.appendChild(trashZone);
+
+                        var houseObj = {
+                            row:       r / 2,
+                            col:       c / 2,
+                            gridRow:   r,
+                            gridCol:   c,
+                            element:   cell,
+                            trashZone: trashZone,
+                            trashCans: []
+                        };
+                        houses.push(houseObj);
+                        houseIndex++;
+                    } else {
+                        // Road cell
+                        cell.className = 'road-cell';
+                    }
+
+                    gridContainer.appendChild(cell);
+                }
+            }
+
+            // Size the canvas overlay to match neighborhood
+            var canvas = document.getElementById('canvas-overlay');
+            canvas.width  = neighborhood.clientWidth;
+            canvas.height = neighborhood.clientHeight;
+        }
+
         function startGame() {
-            // Placeholder — implemented in later tasks
+            document.getElementById('game-area').style.display = 'block';
+            buildGrid();
         }
     </script>
 
