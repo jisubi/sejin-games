@@ -357,7 +357,7 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 10;
+            z-index: 60; /* above canvas overlay (z-index 50) so taps reach trash cans */
             display: flex;
             flex-direction: row;
             align-items: flex-end;
@@ -370,6 +370,7 @@
             position: absolute;
             top: 60px;
             left: 0;
+            width: 100%;
             z-index: 50;
             pointer-events: auto;
         }
@@ -609,7 +610,7 @@
         <div id="end-stats">
             Score: <span id="end-score">0</span><br>
             Trash Collected: <span id="end-collected">0</span><br>
-            Best Streak: <span id="end-streak">0</span>
+            Highest Multiplier: <span id="end-streak">0</span>
         </div>
         <div class="end-btn-row">
             <button onclick="startCountdown()">PLAY AGAIN &#x25B6;</button>
@@ -1383,7 +1384,10 @@
             routePreview.push(gridPos);
         }
 
+        var dragListenersSet = false;
         function setupDragListeners() {
+            if (dragListenersSet) return;
+            dragListenersSet = true;
             var canvas = document.getElementById('canvas-overlay');
 
             canvas.addEventListener('pointerdown', function(e) {
