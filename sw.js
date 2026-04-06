@@ -1,4 +1,4 @@
-var CACHE_NAME = 'sejin-games-v1';
+var CACHE_NAME = 'sejin-games-v2';
 var urlsToCache = [
   '/games.html',
   '/racer.html',
@@ -12,6 +12,7 @@ var urlsToCache = [
   '/sort.html',
   '/match.html',
   '/feed.html',
+  '/trash.html',
   '/Shapes_Colors.html',
   '/manifest.json',
   '/icons/icon-192.png',
