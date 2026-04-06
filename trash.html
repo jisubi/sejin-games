@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2d5016">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Trash Truck!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(135deg, #2d5016, #1a7a4a);
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* ===== PORTRAIT WARNING ===== */
+        #portrait-warning {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            flex-direction: column; justify-content: center; align-items: center;
+            color: white; text-align: center; padding: 20px;
+        }
+
+        @media (orientation: portrait) and (max-width: 900px) {
+            #portrait-warning { display: flex; }
+        }
+
+        #portrait-warning .phone-icon {
+            font-size: 5rem;
+            animation: rotatePhone 1.5s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes rotatePhone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+
+        #portrait-warning p {
+            font-size: 1.5rem;
+            color: #FFD700;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        /* ===== OVERLAYS ===== */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.88);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 600; color: white; text-align: center; padding: 20px;
+        }
+
+        .overlay.hidden { display: none; }
+
+        .overlay h1 {
+            font-size: 3.5rem;
+            color: #FFD700;
+            text-shadow: 3px 3px #333;
+            margin-bottom: 10px;
+        }
+
+        .overlay .sub {
+            font-size: 1.3rem;
+            color: #fff;
+            margin-bottom: 24px;
+            opacity: 0.9;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        .overlay button {
+            padding: 18px 50px;
+            font-size: 2rem;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 6px #2d6a2f;
+            transition: all 0.1s;
+        }
+
+        .overlay button:active {
+            box-shadow: 0 3px #2d6a2f;
+            transform: translateY(3px);
+        }
+
+        /* ===== DIFFICULTY SELECTOR ===== */
+        .diff-selector {
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 28px;
+        }
+
+        .diff-btn {
+            padding: 15px 30px;
+            font-size: 1.3rem;
+            font-family: 'Fredoka One', cursive;
+            border: 4px solid transparent;
+            border-radius: 15px;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.15s;
+        }
+
+        .diff-btn[data-diff="easy"]   { background: #4CAF50; }
+        .diff-btn[data-diff="medium"] { background: #FF9800; }
+        .diff-btn[data-diff="hard"]   { background: #f44336; }
+
+        .diff-btn.selected {
+            border-color: #FFD700;
+            transform: scale(1.1);
+            box-shadow: 0 0 16px rgba(255, 215, 0, 0.7);
+        }
+
+        .diff-btn .diff-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        /* ===== COUNTDOWN SCREEN ===== */
+        #countdown-text {
+            font-size: 8rem;
+            color: #FFD700;
+            text-shadow: 4px 4px #333;
+        }
+
+        /* ===== END SCREEN STATS ===== */
+        #end-stats {
+            font-size: 1.4rem;
+            color: #fff;
+            margin-bottom: 28px;
+            line-height: 2;
+        }
+
+        #end-stats span {
+            color: #FFD700;
+        }
+
+        .end-btn-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn-home {
+            padding: 18px 50px;
+            font-size: 2rem;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, #FF9800, #e68900);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 6px #b56800;
+            transition: all 0.1s;
+        }
+
+        .btn-home:active {
+            box-shadow: 0 3px #b56800;
+            transform: translateY(3px);
+        }
+
+        /* ===== GAME AREA ===== */
+        #game-area {
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            position: relative;
+        }
+
+        /* ===== HUD ===== */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 55px;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 100;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        #hud-score {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #hud-multiplier {
+            background: #616161;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        #hud-multiplier.active {
+            background: #FFD700;
+            color: #333;
+        }
+
+        #hud-timer {
+            font-size: 2rem;
+            text-align: center;
+            min-width: 60px;
+        }
+
+        #hud-timer.warning {
+            color: #f44336;
+            animation: hotPulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes hotPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.8; }
+        }
+
+        #hud-streak {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #streak-bar-wrap {
+            width: 100px;
+            height: 14px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 7px;
+            overflow: hidden;
+        }
+
+        #streak-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #FFD700, #FF8F00);
+            border-radius: 7px;
+            transition: width 0.2s ease;
+        }
+
+        /* ===== NEIGHBORHOOD ===== */
+        #neighborhood {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #grid-container {
+            display: grid;
+        }
+
+        /* ===== HOUSE CELLS ===== */
+        .house-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .house {
+            width: 80%;
+            height: 60%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .house-roof {
+            width: 0;
+            height: 0;
+            border-left: 40% solid transparent;
+            border-right: 40% solid transparent;
+            border-bottom: 30px solid var(--roof-color);
+            position: relative;
+        }
+
+        .house-body {
+            width: 80%;
+            height: 55px;
+            background: var(--house-color);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .house-door {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 18px;
+            height: 26px;
+            background: #5D4037;
+            border-radius: 3px 3px 0 0;
+        }
+
+        .house-window {
+            position: absolute;
+            top: 10px;
+            width: 14px;
+            height: 14px;
+            background: #BBDEFB;
+            border: 2px solid #90CAF9;
+            border-radius: 2px;
+        }
+
+        .house-window.left  { left: 8px; }
+        .house-window.right { right: 8px; }
+
+        /* ===== ROAD CELLS ===== */
+        .road-cell {
+            background: #9e9e9e;
+        }
+
+        /* ===== TRASH ZONE ===== */
+        .trash-zone {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 60; /* above canvas overlay (z-index 50) so taps reach trash cans */
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        /* ===== CANVAS OVERLAY ===== */
+        #canvas-overlay {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            width: 100%;
+            z-index: 50;
+            pointer-events: auto;
+        }
+
+        /* ===== TRASH CAN ===== */
+        .trash-can {
+            width: 28px;
+            height: 34px;
+            position: relative;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.1s;
+        }
+
+        .trash-can:active {
+            transform: scale(0.9);
+        }
+
+        .can-body {
+            position: absolute;
+            bottom: 0;
+            left: 2px;
+            right: 2px;
+            height: 24px;
+            background: var(--can-color, #4CAF50);
+            border-radius: 0 0 4px 4px;
+            transition: background 0.5s;
+        }
+
+        .can-body::before,
+        .can-body::after {
+            content: '';
+            position: absolute;
+            left: 3px;
+            right: 3px;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 1px;
+        }
+
+        .can-body::before {
+            top: 6px;
+        }
+
+        .can-body::after {
+            top: 12px;
+        }
+
+        .can-lid {
+            position: absolute;
+            top: 4px;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: var(--can-color, #4CAF50);
+            border-radius: 3px 3px 0 0;
+            transition: background 0.5s;
+        }
+
+        .can-lid::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 4px;
+            background: var(--can-color, #4CAF50);
+            border-radius: 3px 3px 0 0;
+            transition: background 0.5s;
+        }
+
+        .can-handle-l,
+        .can-handle-r {
+            position: absolute;
+            top: 14px;
+            width: 3px;
+            height: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 1px;
+        }
+
+        .can-handle-l {
+            left: -1px;
+        }
+
+        .can-handle-r {
+            right: -1px;
+        }
+
+        .stink-lines {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 3px;
+        }
+
+        .stink-lines.visible {
+            display: flex;
+        }
+
+        .stink-line {
+            width: 2px;
+            height: 10px;
+            background: #8D6E63;
+            border-radius: 1px;
+            animation: stinkWave 0.8s ease-in-out infinite;
+            opacity: 0.7;
+        }
+
+        .stink-line:nth-child(2) {
+            animation-delay: 0.2s;
+            height: 14px;
+        }
+
+        .stink-line:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes stinkWave {
+            0%, 100% { transform: translateY(0) scaleY(1); opacity: 0.7; }
+            50%       { transform: translateY(-4px) scaleY(1.2); opacity: 1; }
+        }
+
+        .fly {
+            position: absolute;
+            font-size: 10px;
+            animation: flyBuzz 1.2s ease-in-out infinite;
+            display: none;
+        }
+
+        .fly.visible {
+            display: block;
+        }
+
+        .fly:first-of-type {
+            top: -18px;
+            left: -5px;
+        }
+
+        .fly:last-of-type {
+            top: -14px;
+            right: -8px;
+            animation-delay: 0.6s;
+        }
+
+        @keyframes flyBuzz {
+            0%,  100% { transform: translate(0, 0); }
+            25%        { transform: translate(4px, -3px); }
+            50%        { transform: translate(-2px, -5px); }
+            75%        { transform: translate(-4px, -1px); }
+        }
+
+        .points-popup {
+            position: fixed;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.2rem;
+            color: #FFD700;
+            text-shadow: 2px 2px #333;
+            z-index: 200;
+            pointer-events: none;
+            animation: popUp 0.8s ease-out forwards;
+        }
+
+        @keyframes popUp {
+            0%   { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.3); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        /* ===== MULTIPLIER FLASH ===== */
+        .multiplier-flash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,215,0,0.25);
+            z-index: 500; pointer-events: none;
+            animation: flashFade 0.8s ease-out forwards;
+        }
+        .multiplier-flash .mult-text {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            font-family: 'Fredoka One', cursive;
+            font-size: 5rem;
+            color: #FFD700;
+            text-shadow: 3px 3px #333;
+            animation: popUp 1s ease-out forwards;
+        }
+        @keyframes flashFade {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Portrait Warning -->
+    <div id="portrait-warning">
+        <div class="phone-icon">&#x1F4F1;</div>
+        <p>Please rotate your device!</p>
+    </div>
+
+    <!-- Start Screen -->
+    <div class="overlay" id="start-screen">
+        <h1>&#x1F69B; Trash Truck!</h1>
+        <p class="sub">Drive your trash truck around the neighborhood! Pick up all the garbage before it gets too stinky. Tap the trash to collect it!</p>
+        <div class="diff-selector">
+            <button class="diff-btn selected" data-diff="easy" onclick="selectDifficulty('easy')">
+                Easy
+                <span class="diff-label">3x3 grid &middot; slow</span>
+            </button>
+            <button class="diff-btn" data-diff="medium" onclick="selectDifficulty('medium')">
+                Medium
+                <span class="diff-label">4x4 grid &middot; normal</span>
+            </button>
+            <button class="diff-btn" data-diff="hard" onclick="selectDifficulty('hard')">
+                Hard
+                <span class="diff-label">5x5 grid &middot; fast</span>
+            </button>
+        </div>
+        <button onclick="startCountdown()">PLAY &#x25B6;</button>
+    </div>
+
+    <!-- Countdown Screen -->
+    <div class="overlay hidden" id="countdown-screen">
+        <div id="countdown-text">3</div>
+    </div>
+
+    <!-- End Screen -->
+    <div class="overlay hidden" id="end-screen">
+        <h1>&#x23F0; Time's Up!</h1>
+        <div id="end-stats">
+            Score: <span id="end-score">0</span><br>
+            Trash Collected: <span id="end-collected">0</span><br>
+            Highest Multiplier: <span id="end-streak">0</span>
+        </div>
+        <div class="end-btn-row">
+            <button onclick="startCountdown()">PLAY AGAIN &#x25B6;</button>
+            <button class="btn-home" onclick="window.location.href='games.html'">&#x1F3E0; HOME</button>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <div id="hud">
+            <div id="hud-score">Score: <span id="score-value">0</span> <span id="hud-multiplier">1x</span></div>
+            <div id="hud-timer">30</div>
+            <div id="hud-streak"><span id="streak-label">Streak: 0</span>
+                <div id="streak-bar-wrap"><div id="streak-bar-fill"></div></div>
+            </div>
+        </div>
+        <div id="neighborhood">
+            <div id="grid-container"></div>
+        </div>
+        <canvas id="canvas-overlay"></canvas>
+    </div>
+
+    <script>
+        // Game config
+        var DIFFICULTIES = {
+            easy:   { grid: 3, maxTrash: 1, spawnStart: 4000, spawnEnd: 2000 },
+            medium: { grid: 4, maxTrash: 2, spawnStart: 3000, spawnEnd: 1500 },
+            hard:   { grid: 5, maxTrash: 3, spawnStart: 2000, spawnEnd: 1000 }
+        };
+        var FRESHNESS = [
+            { name: 'fresh',   maxAge: 4000,     color: '#4CAF50', points: 10, stinky: false },
+            { name: 'warming', maxAge: 7000,     color: '#FFC107', points: 7,  stinky: false },
+            { name: 'stinky',  maxAge: 10000,    color: '#FF9800', points: 4,  stinky: true },
+            { name: 'rotten',  maxAge: Infinity, color: '#f44336', points: 1,  stinky: true }
+        ];
+        var GAME_DURATION = 30000;
+        var MULTIPLIER_THRESHOLDS = [
+            { streak: 10, multiplier: 2 },
+            { streak: 20, multiplier: 3 }
+        ];
+
+        var selectedDifficulty = 'easy';
+
+        function selectDifficulty(diff) {
+            selectedDifficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(function(b) {
+                b.classList.toggle('selected', b.dataset.diff === diff);
+            });
+        }
+
+        function startCountdown() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            var countdownScreen = document.getElementById('countdown-screen');
+            var countdownText = document.getElementById('countdown-text');
+            countdownScreen.classList.remove('hidden');
+            var count = 3;
+            countdownText.textContent = count;
+            var interval = setInterval(function() {
+                count--;
+                if (count > 0) {
+                    countdownText.textContent = count;
+                } else if (count === 0) {
+                    countdownText.textContent = 'GO!';
+                } else {
+                    clearInterval(interval);
+                    countdownScreen.classList.add('hidden');
+                    startGame();
+                }
+            }, 700);
+        }
+
+        // ===== GRID / HOUSE CONSTANTS =====
+        var HOUSE_COLORS = ['#e57373','#64B5F6','#81C784','#FFB74D','#BA68C8','#4DB6AC','#FF8A65','#A1887F','#90A4AE'];
+        var ROOF_COLORS  = ['#c62828','#1565C0','#2E7D32','#E65100','#6A1B9A','#00695C','#D84315','#4E342E','#37474F'];
+
+        var gridSize  = 3;
+        var houses    = [];
+        var truckPos  = { row: 0, col: 0 };
+
+        function buildGrid() {
+            var diff = DIFFICULTIES[selectedDifficulty];
+            gridSize = diff.grid;
+
+            houses = [];
+
+            var neighborhood  = document.getElementById('neighborhood');
+            var gridContainer = document.getElementById('grid-container');
+
+            // Clear container safely (no innerHTML)
+            while (gridContainer.firstChild) {
+                gridContainer.removeChild(gridContainer.firstChild);
+            }
+
+            var availWidth  = neighborhood.clientWidth;
+            var availHeight = neighborhood.clientHeight;
+            var totalCells  = gridSize * 2 - 1;
+            var cellSize    = Math.floor(Math.min(availWidth / totalCells, availHeight / totalCells, 120));
+
+            gridContainer.style.gridTemplateColumns = 'repeat(' + totalCells + ', ' + cellSize + 'px)';
+            gridContainer.style.gridTemplateRows    = 'repeat(' + totalCells + ', ' + cellSize + 'px)';
+
+            var houseIndex = 0;
+
+            for (var r = 0; r < totalCells; r++) {
+                for (var c = 0; c < totalCells; c++) {
+                    var cell = document.createElement('div');
+                    cell.style.width  = cellSize + 'px';
+                    cell.style.height = cellSize + 'px';
+
+                    if (r % 2 === 0 && c % 2 === 0) {
+                        // House cell
+                        cell.className = 'house-cell';
+
+                        var colorIdx = houseIndex % HOUSE_COLORS.length;
+
+                        // House wrapper
+                        var house = document.createElement('div');
+                        house.className = 'house';
+                        house.style.setProperty('--house-color', HOUSE_COLORS[colorIdx]);
+                        house.style.setProperty('--roof-color',  ROOF_COLORS[colorIdx]);
+
+                        // Roof
+                        var roof = document.createElement('div');
+                        roof.className = 'house-roof';
+                        var roofHalf = Math.round(cellSize * 0.16);
+                        roof.style.borderLeftWidth   = roofHalf + 'px';
+                        roof.style.borderRightWidth  = roofHalf + 'px';
+                        roof.style.borderBottomWidth = Math.round(cellSize * 0.22) + 'px';
+
+                        // Body
+                        var body = document.createElement('div');
+                        body.className = 'house-body';
+                        body.style.height = Math.round(cellSize * 0.38) + 'px';
+
+                        // Door
+                        var door = document.createElement('div');
+                        door.className = 'house-door';
+
+                        // Windows
+                        var winL = document.createElement('div');
+                        winL.className = 'house-window left';
+
+                        var winR = document.createElement('div');
+                        winR.className = 'house-window right';
+
+                        body.appendChild(winL);
+                        body.appendChild(winR);
+                        body.appendChild(door);
+                        house.appendChild(roof);
+                        house.appendChild(body);
+                        cell.appendChild(house);
+
+                        // Trash zone
+                        var trashZone = document.createElement('div');
+                        trashZone.className = 'trash-zone';
+                        cell.appendChild(trashZone);
+
+                        var houseObj = {
+                            row:       r / 2,
+                            col:       c / 2,
+                            gridRow:   r,
+                            gridCol:   c,
+                            element:   cell,
+                            trashZone: trashZone,
+                            trashCans: []
+                        };
+                        houses.push(houseObj);
+                        houseIndex++;
+                    } else {
+                        // Road cell
+                        cell.className = 'road-cell';
+                    }
+
+                    gridContainer.appendChild(cell);
+                }
+            }
+
+            // Size the canvas overlay to match neighborhood
+            var canvas = document.getElementById('canvas-overlay');
+            canvas.width  = neighborhood.clientWidth;
+            canvas.height = neighborhood.clientHeight;
+        }
+
+        // ===== TRASH SYSTEM =====
+        var allTrashCans = [];
+        var trashIdCounter = 0;
+        var spawnTimer = null;
+        var decayInterval = null;
+        var gameRunning = false;
+        var gameStartTime = 0;
+
+        function createTrashCan(house) {
+            var id = trashIdCounter++;
+            var el = document.createElement('div');
+            el.className = 'trash-can';
+            el.dataset.trashId = id;
+            el.style.setProperty('--can-color', '#4CAF50');
+
+            var lid = document.createElement('div');
+            lid.className = 'can-lid';
+            el.appendChild(lid);
+
+            var body = document.createElement('div');
+            body.className = 'can-body';
+            el.appendChild(body);
+
+            var handleL = document.createElement('div');
+            handleL.className = 'can-handle-l';
+            el.appendChild(handleL);
+
+            var handleR = document.createElement('div');
+            handleR.className = 'can-handle-r';
+            el.appendChild(handleR);
+
+            var stinkLines = document.createElement('div');
+            stinkLines.className = 'stink-lines';
+            for (var s = 0; s < 3; s++) {
+                var line = document.createElement('div');
+                line.className = 'stink-line';
+                stinkLines.appendChild(line);
+            }
+            el.appendChild(stinkLines);
+
+            var fly1 = document.createElement('div');
+            fly1.className = 'fly';
+            fly1.textContent = '\uD83E\uDEB0'; // fly emoji
+            el.appendChild(fly1);
+
+            var fly2 = document.createElement('div');
+            fly2.className = 'fly';
+            fly2.textContent = '\uD83E\uDEB0';
+            el.appendChild(fly2);
+
+            el.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                onTrashTap(id);
+            });
+
+            house.trashZone.appendChild(el);
+
+            var trashObj = { id: id, house: house, element: el, spawnTime: Date.now(), collected: false };
+            allTrashCans.push(trashObj);
+            house.trashCans.push(trashObj);
+            return trashObj;
+        }
+
+        function getFreshness(trashCan) {
+            var age = Date.now() - trashCan.spawnTime;
+            for (var i = 0; i < FRESHNESS.length; i++) {
+                if (age < FRESHNESS[i].maxAge) return FRESHNESS[i];
+            }
+            return FRESHNESS[FRESHNESS.length - 1];
+        }
+
+        function updateTrashVisuals() {
+            for (var i = 0; i < allTrashCans.length; i++) {
+                var tc = allTrashCans[i];
+                if (tc.collected) continue;
+                var f = getFreshness(tc);
+                tc.element.style.setProperty('--can-color', f.color);
+
+                var stinkLines = tc.element.querySelector('.stink-lines');
+                var flies = tc.element.querySelectorAll('.fly');
+                if (f.name === 'stinky' || f.name === 'rotten') {
+                    stinkLines.classList.add('visible');
+                } else {
+                    stinkLines.classList.remove('visible');
+                }
+                if (f.name === 'rotten') {
+                    flies[0].classList.add('visible');
+                    flies[1].classList.add('visible');
+                } else {
+                    flies[0].classList.remove('visible');
+                    flies[1].classList.remove('visible');
+                }
+            }
+        }
+
+        function spawnTrash() {
+            var config = DIFFICULTIES[selectedDifficulty];
+            var available = houses.filter(function(h) {
+                return h.trashCans.filter(function(t) { return !t.collected; }).length < config.maxTrash;
+            });
+            if (available.length === 0) return;
+            var house = available[Math.floor(Math.random() * available.length)];
+            createTrashCan(house);
+        }
+
+        function scheduleNextSpawn() {
+            if (!gameRunning) return;
+            var config = DIFFICULTIES[selectedDifficulty];
+            var elapsed = Date.now() - gameStartTime;
+            var progress = Math.min(elapsed / GAME_DURATION, 1);
+            var interval = config.spawnStart + (config.spawnEnd - config.spawnStart) * progress;
+            spawnTimer = setTimeout(function() {
+                spawnTrash();
+                scheduleNextSpawn();
+            }, interval);
+        }
+
+        // ===== SCORING =====
+        var score = 0;
+        var streak = 0;
+        var multiplier = 1;
+        var highestMultiplier = 1;
+        var trashCollected = 0;
+        var gameTimerInterval = null;
+
+        function getMultiplier() {
+            for (var i = MULTIPLIER_THRESHOLDS.length - 1; i >= 0; i--) {
+                if (streak >= MULTIPLIER_THRESHOLDS[i].streak) return MULTIPLIER_THRESHOLDS[i].multiplier;
+            }
+            return 1;
+        }
+
+        function collectTrash(trashCan) {
+            if (trashCan.collected) return;
+            trashCan.collected = true;
+            truckChomp();
+
+            var f = getFreshness(trashCan);
+            var points = f.points * multiplier;
+
+            if (f.stinky) {
+                streak = 0;
+            } else {
+                streak++;
+            }
+            var newMultiplier = getMultiplier();
+            if (newMultiplier > multiplier) {
+                showMultiplierUpgrade(newMultiplier);
+            }
+            if (newMultiplier < multiplier) {
+                showStreakBreak();
+            }
+            multiplier = newMultiplier;
+            if (multiplier > highestMultiplier) highestMultiplier = multiplier;
+
+            score += points;
+            trashCollected++;
+
+            showPointsPopup(trashCan.element, '+' + points, multiplier > 1);
+
+            trashCan.element.style.transition = 'transform 0.2s, opacity 0.2s';
+            trashCan.element.style.transform = 'scale(0)';
+            trashCan.element.style.opacity = '0';
+            setTimeout(function() {
+                if (trashCan.element.parentNode) {
+                    trashCan.element.parentNode.removeChild(trashCan.element);
+                }
+            }, 200);
+
+            var idx = trashCan.house.trashCans.indexOf(trashCan);
+            if (idx > -1) trashCan.house.trashCans.splice(idx, 1);
+
+            updateHUD();
+        }
+
+        function showPointsPopup(anchorEl, text, isMultiplied) {
+            var rect = anchorEl.getBoundingClientRect();
+            var popup = document.createElement('div');
+            popup.className = 'points-popup';
+            popup.textContent = text;
+            if (isMultiplied) popup.style.color = '#FFD700';
+            popup.style.left = rect.left + rect.width / 2 - 20 + 'px';
+            popup.style.top = rect.top + 'px';
+            document.body.appendChild(popup);
+            setTimeout(function() { popup.remove(); }, 800);
+        }
+
+        function showMultiplierUpgrade(newMult) {
+            var flash = document.createElement('div');
+            flash.className = 'multiplier-flash';
+            var txt = document.createElement('div');
+            txt.className = 'mult-text';
+            txt.textContent = newMult + 'x!';
+            flash.appendChild(txt);
+            document.body.appendChild(flash);
+            setTimeout(function() { flash.remove(); }, 1000);
+        }
+
+        function showStreakBreak() {
+            var bar = document.getElementById('streak-bar-wrap');
+            bar.style.animation = 'none';
+            bar.offsetHeight;
+            bar.style.animation = 'shake 0.4s ease';
+        }
+
+        function updateHUD() {
+            document.getElementById('score-value').textContent = score;
+            var multEl = document.getElementById('hud-multiplier');
+            multEl.textContent = multiplier + 'x';
+            multEl.classList.toggle('active', multiplier > 1);
+            document.getElementById('streak-label').textContent = 'Streak: ' + streak;
+
+            var nextThreshold = 10;
+            var barBase = 0;
+            if (streak >= 20) {
+                nextThreshold = 20; barBase = 0;
+            } else if (streak >= 10) {
+                nextThreshold = 20; barBase = 10;
+            }
+            var barProgress = Math.min((streak - barBase) / (nextThreshold - barBase) * 100, 100);
+            if (streak >= 20) barProgress = 100;
+            document.getElementById('streak-bar-fill').style.width = barProgress + '%';
+        }
+
+        // ===== GAME TIMER =====
+        function startGameTimer() {
+            var timerEl = document.getElementById('hud-timer');
+            gameTimerInterval = setInterval(function() {
+                var elapsed = Date.now() - gameStartTime;
+                var remaining = Math.max(0, Math.ceil((GAME_DURATION - elapsed) / 1000));
+                timerEl.textContent = remaining;
+                timerEl.classList.toggle('warning', remaining <= 5);
+                if (remaining <= 0) {
+                    endGame();
+                }
+            }, 100);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameTimerInterval);
+            clearInterval(decayInterval);
+            clearTimeout(spawnTimer);
+            if (truckAnimFrame) cancelAnimationFrame(truckAnimFrame);
+
+            document.getElementById('game-area').style.display = 'none';
+
+            var stars = 1;
+            var theoreticalMax = { easy: 300, medium: 500, hard: 800 };
+            var maxScore = theoreticalMax[selectedDifficulty] || 300;
+            if (score >= maxScore * 0.8) stars = 3;
+            else if (score >= maxScore * 0.5) stars = 2;
+
+            var starStr = '';
+            for (var i = 0; i < 3; i++) starStr += (i < stars ? '\u2B50' : '\u2606');
+
+            document.getElementById('end-score').textContent = score;
+            document.getElementById('end-collected').textContent = trashCollected;
+            document.getElementById('end-streak').textContent = highestMultiplier + 'x';
+
+            // Insert stars before stats
+            var statsEl = document.getElementById('end-stats');
+            var existingStar = document.getElementById('end-stars');
+            if (existingStar) existingStar.remove();
+            var starDiv = document.createElement('div');
+            starDiv.id = 'end-stars';
+            starDiv.style.cssText = 'font-size:3rem;margin-bottom:10px;';
+            starDiv.textContent = starStr;
+            statsEl.parentNode.insertBefore(starDiv, statsEl);
+
+            document.getElementById('end-screen').classList.remove('hidden');
+        }
+
+        // ===== TRUCK & PATHFINDING =====
+        var truck = { row: 0, col: 0, x: 0, y: 0, targetX: 0, targetY: 0, direction: 'right', moving: false };
+        var currentRoute = [];
+        var currentRouteIndex = 0;
+        var truckAnimFrame = null;
+        var TRUCK_SPEED = 3;
+        var routePreview = [];
+        var truckChomping = false;
+        var chompTimer = 0;
+
+        function truckChomp() {
+            truckChomping = true;
+            chompTimer = 12;
+        }
+
+        function gridToPixel(gridRow, gridCol) {
+            var container = document.getElementById('grid-container');
+            var rect = container.getBoundingClientRect();
+            var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+            var totalCells = gridSize * 2 - 1;
+            var cellSize = rect.width / totalCells;
+            var pixelX = rect.left - neighborhoodRect.left + (gridCol * 2) * cellSize + cellSize / 2;
+            var pixelY = rect.top - neighborhoodRect.top + (gridRow * 2) * cellSize + cellSize / 2;
+            return { x: pixelX, y: pixelY };
+        }
+
+        function bfsPath(startRow, startCol, endRow, endCol) {
+            if (startRow === endRow && startCol === endCol) return [{ row: endRow, col: endCol }];
+            var visited = {};
+            var queue = [{ row: startRow, col: startCol, path: [{ row: startRow, col: startCol }] }];
+            visited[startRow + ',' + startCol] = true;
+            var dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            while (queue.length > 0) {
+                var current = queue.shift();
+                for (var d = 0; d < dirs.length; d++) {
+                    var nr = current.row + dirs[d][0];
+                    var nc = current.col + dirs[d][1];
+                    if (nr < 0 || nr >= gridSize || nc < 0 || nc >= gridSize) continue;
+                    if (visited[nr + ',' + nc]) continue;
+                    visited[nr + ',' + nc] = true;
+                    var newPath = current.path.concat([{ row: nr, col: nc }]);
+                    if (nr === endRow && nc === endCol) return newPath;
+                    queue.push({ row: nr, col: nc, path: newPath });
+                }
+            }
+            return [];
+        }
+
+        function startRoute(route) {
+            if (route.length < 2) {
+                collectTrashAtPosition(route[0].row, route[0].col);
+                return;
+            }
+            currentRoute = route;
+            currentRouteIndex = 1;
+            truck.moving = true;
+            var nextPos = gridToPixel(currentRoute[1].row, currentRoute[1].col);
+            truck.targetX = nextPos.x;
+            truck.targetY = nextPos.y;
+            updateTruckDirection(currentRoute[1].row - currentRoute[0].row, currentRoute[1].col - currentRoute[0].col);
+        }
+
+        function updateTruckDirection(dr, dc) {
+            if (dc > 0) truck.direction = 'right';
+            else if (dc < 0) truck.direction = 'left';
+            else if (dr > 0) truck.direction = 'down';
+            else if (dr < 0) truck.direction = 'up';
+        }
+
+        function collectTrashAtPosition(row, col) {
+            var house = houses.find(function(h) { return h.row === row && h.col === col; });
+            if (!house) return;
+            for (var i = 0; i < allTrashCans.length; i++) {
+                var tc = allTrashCans[i];
+                if (tc.house === house && !tc.collected) {
+                    collectTrash(tc);
+                    return;
+                }
+            }
+        }
+
+        function getNearestGridRow() {
+            var minDist = Infinity;
+            var nearest = truck.row;
+            for (var r = 0; r < gridSize; r++) {
+                var pos = gridToPixel(r, truck.col);
+                var dist = Math.abs(truck.y - pos.y);
+                if (dist < minDist) { minDist = dist; nearest = r; }
+            }
+            return nearest;
+        }
+
+        function getNearestGridCol() {
+            var minDist = Infinity;
+            var nearest = truck.col;
+            for (var c = 0; c < gridSize; c++) {
+                var pos = gridToPixel(truck.row, c);
+                var dist = Math.abs(truck.x - pos.x);
+                if (dist < minDist) { minDist = dist; nearest = c; }
+            }
+            return nearest;
+        }
+
+        function truckAnimationLoop() {
+            if (!gameRunning) return;
+
+            var canvas = document.getElementById('canvas-overlay');
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (truck.moving && currentRoute.length > 0) {
+                var dx = truck.targetX - truck.x;
+                var dy = truck.targetY - truck.y;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < TRUCK_SPEED) {
+                    truck.x = truck.targetX;
+                    truck.y = truck.targetY;
+                    truck.row = currentRoute[currentRouteIndex].row;
+                    truck.col = currentRoute[currentRouteIndex].col;
+
+                    collectTrashAtPosition(truck.row, truck.col);
+
+                    currentRouteIndex++;
+                    if (currentRouteIndex < currentRoute.length) {
+                        var nextPos = gridToPixel(currentRoute[currentRouteIndex].row, currentRoute[currentRouteIndex].col);
+                        truck.targetX = nextPos.x;
+                        truck.targetY = nextPos.y;
+                        var prev = currentRoute[currentRouteIndex - 1];
+                        var curr = currentRoute[currentRouteIndex];
+                        updateTruckDirection(curr.row - prev.row, curr.col - prev.col);
+                    } else {
+                        truck.moving = false;
+                        currentRoute = [];
+                    }
+                } else {
+                    truck.x += (dx / dist) * TRUCK_SPEED;
+                    truck.y += (dy / dist) * TRUCK_SPEED;
+                }
+            }
+
+            // Draw route preview (dashed yellow line)
+            if (routePreview.length > 1) {
+                ctx.strokeStyle = 'rgba(255, 235, 59, 0.7)';
+                ctx.lineWidth = 6;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.setLineDash([8, 6]);
+                ctx.beginPath();
+                var first = gridToPixel(routePreview[0].row, routePreview[0].col);
+                ctx.moveTo(first.x, first.y);
+                for (var i = 1; i < routePreview.length; i++) {
+                    var pt = gridToPixel(routePreview[i].row, routePreview[i].col);
+                    ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw trash indicators on route
+                for (var rp = 0; rp < routePreview.length; rp++) {
+                    var rpPos = routePreview[rp];
+                    var rpHouse = houses.find(function(h) { return h.row === rpPos.row && h.col === rpPos.col; });
+                    if (rpHouse && rpHouse.trashCans.some(function(t) { return !t.collected; })) {
+                        var indicator = gridToPixel(rpPos.row, rpPos.col);
+                        ctx.beginPath();
+                        ctx.arc(indicator.x, indicator.y - 20, 8, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255, 235, 59, 0.8)';
+                        ctx.fill();
+                        ctx.strokeStyle = '#F57F17';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.fillStyle = '#333';
+                        ctx.font = 'bold 10px Fredoka One, cursive';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('\u2713', indicator.x, indicator.y - 20);
+                    }
+                }
+            }
+
+            // Draw truck
+            drawTruck(ctx, truck.x, truck.y, truck.direction);
+
+            truckAnimFrame = requestAnimationFrame(truckAnimationLoop);
+        }
+
+        function drawTruck(ctx, x, y, direction) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            var angle = 0;
+            if (direction === 'right') angle = 0;
+            else if (direction === 'down') angle = Math.PI / 2;
+            else if (direction === 'left') angle = Math.PI;
+            else if (direction === 'up') angle = -Math.PI / 2;
+            ctx.rotate(angle);
+
+            var w = 36, h = 24;
+
+            // Garbage section
+            ctx.fillStyle = '#43A047';
+            ctx.fillRect(-w / 2, -h / 2, w * 0.65, h);
+            ctx.strokeStyle = '#2E7D32';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-w / 2, -h / 2, w * 0.65, h);
+
+            // Chomp animation: lid opens when collecting
+            if (truckChomping && chompTimer > 6) {
+                ctx.fillStyle = '#2E7D32';
+                ctx.fillRect(-w / 2, -h / 2 - 6, w * 0.65, 5);
+            }
+
+            // Cab
+            ctx.fillStyle = '#66BB6A';
+            ctx.fillRect(-w / 2 + w * 0.65, -h / 2 + 2, w * 0.35, h - 4);
+            ctx.strokeStyle = '#2E7D32';
+            ctx.strokeRect(-w / 2 + w * 0.65, -h / 2 + 2, w * 0.35, h - 4);
+
+            // Windshield
+            ctx.fillStyle = '#BBDEFB';
+            ctx.fillRect(-w / 2 + w * 0.72, -h / 2 + 5, w * 0.2, h - 10);
+
+            // Wheels
+            ctx.fillStyle = '#333';
+            ctx.beginPath(); ctx.arc(-w / 2 + 8, h / 2 + 1, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-w / 2 + w * 0.55, h / 2 + 1, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w / 2 - 5, h / 2 + 1, 3, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+
+            if (truckChomping) {
+                chompTimer--;
+                if (chompTimer <= 0) truckChomping = false;
+            }
+        }
+
+        // ===== TAP-TO-COLLECT =====
+        function onTrashTap(trashId) {
+            if (!gameRunning) return;
+            var trashCan = allTrashCans.find(function(t) { return t.id === trashId; });
+            if (!trashCan || trashCan.collected) return;
+
+            var targetRow = trashCan.house.row;
+            var targetCol = trashCan.house.col;
+
+            // Snap truck to nearest grid point (cancel current route)
+            truck.row = getNearestGridRow();
+            truck.col = getNearestGridCol();
+            var snapPos = gridToPixel(truck.row, truck.col);
+            truck.x = snapPos.x;
+            truck.y = snapPos.y;
+
+            var path = bfsPath(truck.row, truck.col, targetRow, targetCol);
+            if (path.length > 0) {
+                startRoute(path);
+            }
+        }
+
+        // ===== DRAG-TO-ROUTE =====
+        var isDragging = false;
+
+        function getGridPosFromPixel(px, py) {
+            var container = document.getElementById('grid-container');
+            var rect = container.getBoundingClientRect();
+            var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+            var totalCells = gridSize * 2 - 1;
+            var cellSize = rect.width / totalCells;
+
+            var relX = px - (rect.left - neighborhoodRect.left);
+            var relY = py - (rect.top - neighborhoodRect.top);
+
+            var col = Math.round(relX / cellSize / 2);
+            var row = Math.round(relY / cellSize / 2);
+            col = Math.max(0, Math.min(gridSize - 1, col));
+            row = Math.max(0, Math.min(gridSize - 1, row));
+            return { row: row, col: col };
+        }
+
+        function isAdjacent(a, b) {
+            return (Math.abs(a.row - b.row) + Math.abs(a.col - b.col)) === 1;
+        }
+
+        function addToRoutePreview(gridPos) {
+            if (routePreview.length === 0) {
+                routePreview.push(gridPos);
+                return;
+            }
+            var last = routePreview[routePreview.length - 1];
+            if (last.row === gridPos.row && last.col === gridPos.col) return;
+
+            // Check backtracking
+            for (var i = 0; i < routePreview.length - 1; i++) {
+                if (routePreview[i].row === gridPos.row && routePreview[i].col === gridPos.col) {
+                    routePreview = routePreview.slice(0, i + 1);
+                    return;
+                }
+            }
+
+            // Fill gap if not adjacent
+            if (!isAdjacent(last, gridPos)) {
+                var fillPath = bfsPath(last.row, last.col, gridPos.row, gridPos.col);
+                for (var j = 1; j < fillPath.length; j++) {
+                    var exists = false;
+                    for (var k = 0; k < routePreview.length; k++) {
+                        if (routePreview[k].row === fillPath[j].row && routePreview[k].col === fillPath[j].col) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) routePreview.push(fillPath[j]);
+                }
+                return;
+            }
+
+            routePreview.push(gridPos);
+        }
+
+        var dragListenersSet = false;
+        function setupDragListeners() {
+            if (dragListenersSet) return;
+            dragListenersSet = true;
+            var canvas = document.getElementById('canvas-overlay');
+
+            canvas.addEventListener('pointerdown', function(e) {
+                if (!gameRunning) return;
+                isDragging = true;
+                routePreview = [];
+
+                var snapRow = getNearestGridRow();
+                var snapCol = getNearestGridCol();
+                routePreview.push({ row: snapRow, col: snapCol });
+
+                var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+                var pos = getGridPosFromPixel(e.clientX - neighborhoodRect.left, e.clientY - neighborhoodRect.top);
+                addToRoutePreview(pos);
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointermove', function(e) {
+                if (!isDragging || !gameRunning) return;
+                var neighborhoodRect = document.getElementById('neighborhood').getBoundingClientRect();
+                var pos = getGridPosFromPixel(e.clientX - neighborhoodRect.left, e.clientY - neighborhoodRect.top);
+                addToRoutePreview(pos);
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointerup', function(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                if (routePreview.length >= 2 && gameRunning) {
+                    truck.row = getNearestGridRow();
+                    truck.col = getNearestGridCol();
+                    var snapPos = gridToPixel(truck.row, truck.col);
+                    truck.x = snapPos.x;
+                    truck.y = snapPos.y;
+
+                    var fullRoute = [{ row: truck.row, col: truck.col }];
+                    for (var i = 1; i < routePreview.length; i++) {
+                        if (routePreview[i].row !== fullRoute[fullRoute.length - 1].row ||
+                            routePreview[i].col !== fullRoute[fullRoute.length - 1].col) {
+                            fullRoute.push(routePreview[i]);
+                        }
+                    }
+                    startRoute(fullRoute);
+                }
+                routePreview = [];
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('pointercancel', function() {
+                isDragging = false;
+                routePreview = [];
+            });
+        }
+
+        // ===== START GAME =====
+        function startGame() {
+            // Reset all state
+            allTrashCans = [];
+            trashIdCounter = 0;
+            score = 0;
+            streak = 0;
+            multiplier = 1;
+            highestMultiplier = 1;
+            trashCollected = 0;
+            gameRunning = true;
+            gameStartTime = Date.now();
+            currentRoute = [];
+            routePreview = [];
+            isDragging = false;
+
+            // Reset HUD
+            updateHUD();
+            document.getElementById('hud-timer').textContent = '30';
+            document.getElementById('hud-timer').classList.remove('warning');
+
+            // Show game area and build grid
+            document.getElementById('game-area').style.display = 'block';
+            buildGrid();
+
+            // Initialize truck at bottom-left
+            truck.row = gridSize - 1;
+            truck.col = 0;
+            truck.moving = false;
+            truck.direction = 'right';
+            var startPos = gridToPixel(truck.row, truck.col);
+            truck.x = startPos.x;
+            truck.y = startPos.y;
+
+            // Set up drag listeners
+            setupDragListeners();
+
+            // Start animation loop
+            if (truckAnimFrame) cancelAnimationFrame(truckAnimFrame);
+            truckAnimationLoop();
+
+            // Start timer
+            startGameTimer();
+
+            // Start trash spawning after 2s delay
+            setTimeout(function() {
+                if (!gameRunning) return;
+                spawnTrash();
+                scheduleNextSpawn();
+            }, 2000);
+
+            // Start decay visual updates
+            decayInterval = setInterval(updateTrashVisuals, 100);
+        }
+    </script>
+
+</body>
+</html>

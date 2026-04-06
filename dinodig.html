@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dino Dig!</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
@@ -18,6 +18,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            touch-action: manipulation;
         }
 
         /* ===== OVERLAYS ===== */
@@ -188,6 +189,7 @@
             border: 4px solid #8B6914;
             box-shadow: 0 8px 30px rgba(0,0,0,0.3);
             overflow: hidden;
+            min-width: 240px;
         }
 
         /* Fossil image behind the grid */
@@ -224,8 +226,8 @@
             position: absolute;
             top: 0; left: 0;
             display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            grid-template-rows: repeat(8, 1fr);
+            grid-template-columns: repeat(var(--grid-cols, 10), 1fr);
+            grid-template-rows: repeat(var(--grid-rows, 8), 1fr);
             gap: 0px;
             width: 100%;
             height: 100%;
@@ -237,7 +239,7 @@
             transition: transform 0.08s;
             opacity: 1;
         }
-        .dirt-cell:active { transform: scale(0.9); }
+        .dirt-cell:active { transform: scale(0.85); }
         .dirt-cell:hover { filter: brightness(1.15); }
 
         /* Dirt color variations */
@@ -298,6 +300,39 @@
         #dig-container.almost-done {
             animation: borderGlow 1s ease-in-out infinite;
         }
+
+        /* ===== ROTATE DEVICE OVERLAY ===== */
+        #rotate-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92);
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9999; color: white; text-align: center;
+            padding: 20px;
+        }
+        #rotate-overlay .rotate-icon {
+            font-size: 5rem;
+            animation: rotateHint 2s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes rotateHint {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-30deg); }
+            75% { transform: rotate(30deg); }
+        }
+        #rotate-overlay .rotate-text {
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.5rem;
+            color: #FFD700;
+            max-width: 300px;
+            line-height: 1.4;
+        }
+
+        @media (orientation: portrait) and (max-width: 768px) {
+            #rotate-overlay { display: flex; }
+        }
+        @media (orientation: landscape), (min-width: 769px) {
+            #rotate-overlay { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -306,8 +341,9 @@
 (function() {
     "use strict";
 
-    var COLS = 10;
-    var ROWS = 8;
+    var IS_MOBILE = window.innerWidth < 600;
+    var COLS = IS_MOBILE ? 6 : 10;
+    var ROWS = IS_MOBILE ? 5 : 8;
     var REVEAL_THRESHOLD = 0.55;
     var TOTAL_CELLS = COLS * ROWS;
 
@@ -580,6 +616,29 @@
         dugCount = 0;
         revealed = false;
         digContainer.classList.remove("almost-done");
+
+        // Recalculate grid size based on current screen width
+        IS_MOBILE = window.innerWidth < 600;
+        COLS = IS_MOBILE ? 6 : 10;
+        ROWS = IS_MOBILE ? 5 : 8;
+        TOTAL_CELLS = COLS * ROWS;
+
+        // Set CSS custom properties for grid dimensions
+        digGrid.style.setProperty("--grid-cols", COLS);
+        digGrid.style.setProperty("--grid-rows", ROWS);
+
+        // Update container aspect ratio to match grid
+        digContainer.style.aspectRatio = COLS + " / " + ROWS;
+
+        // Ensure minimum cell size of 40px on any device
+        var containerWidth = Math.min(window.innerWidth * 0.9, 560);
+        var minGridWidth = COLS * 40;
+        if (containerWidth < minGridWidth) {
+            digContainer.style.width = minGridWidth + "px";
+        } else {
+            digContainer.style.width = "min(90vw, 560px)";
+        }
+
         updateDigPercent();
 
         for (var r = 0; r < ROWS; r++) {
@@ -790,6 +849,22 @@
     playBtn.addEventListener("click", startGame);
     nextBtn.addEventListener("click", nextDig);
     restartBtn.addEventListener("click", restart);
+
+    // --- Rotate Device Overlay ---
+    var rotateOverlay = document.createElement("div");
+    rotateOverlay.id = "rotate-overlay";
+
+    var rotateIcon = document.createElement("div");
+    rotateIcon.className = "rotate-icon";
+    rotateIcon.textContent = "\u{1F4F1}";
+    rotateOverlay.appendChild(rotateIcon);
+
+    var rotateText = document.createElement("div");
+    rotateText.className = "rotate-text";
+    rotateText.textContent = "Please rotate your device to landscape mode for the best digging experience!";
+    rotateOverlay.appendChild(rotateText);
+
+    document.body.appendChild(rotateOverlay);
 
 })();
 </script>
