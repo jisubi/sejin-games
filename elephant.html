@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#87CEEB">
+<title>Peanut Catch!</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    font-family: 'Fredoka One', cursive;
+    background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 60%, #90EE90 100%);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    height: 100%;
+    width: 100%;
+}
+canvas { display: block; cursor: none; }
+
+.hud {
+    position: fixed;
+    top: 12px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 10;
+    pointer-events: none;
+    font-size: 1.6rem;
+    color: white;
+    text-shadow: 2px 2px #333, -1px -1px #333, 1px -1px #333, -1px 1px #333;
+}
+.hud .box {
+    background: rgba(255,255,255,0.25);
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: 3px solid white;
+    min-width: 110px;
+    text-align: center;
+}
+.hud .label { font-size: 0.8rem; display: block; opacity: 0.9; }
+.hud .mult { color: #FFD700; }
+.hud .mult.hot { animation: pulse 0.5s ease-in-out infinite; }
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+.overlay.hidden { display: none; }
+.overlay h1 {
+    font-size: 3.5rem;
+    color: #FFD700;
+    text-shadow: 3px 3px #333;
+    margin-bottom: 10px;
+}
+.overlay .sub {
+    font-size: 1.2rem;
+    max-width: 480px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+.overlay button {
+    padding: 18px 50px;
+    font-size: 2rem;
+    font-family: 'Fredoka One', cursive;
+    background: linear-gradient(to bottom, #4CAF50, #45a049);
+    color: white;
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    box-shadow: 0 6px #2d6a2f;
+    margin: 6px;
+}
+.overlay button:active {
+    box-shadow: 0 3px #2d6a2f;
+    transform: translateY(3px);
+}
+.overlay button.home {
+    background: linear-gradient(to bottom, #2196F3, #1976D2);
+    box-shadow: 0 6px #1565C0;
+    font-size: 1.3rem;
+    padding: 12px 30px;
+}
+.end-stats {
+    font-size: 1.3rem;
+    margin: 16px 0;
+    line-height: 1.8;
+}
+.end-stats .big {
+    font-size: 3rem;
+    color: #FFD700;
+}
+
+.popup {
+    position: absolute;
+    font-size: 1.8rem;
+    font-family: 'Fredoka One', cursive;
+    pointer-events: none;
+    text-shadow: 2px 2px #333;
+    animation: floatUp 0.9s ease-out forwards;
+    z-index: 5;
+}
+@keyframes floatUp {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-60px) scale(1.3); opacity: 0; }
+}
+
+@media (max-width: 600px) {
+    .hud { font-size: 1.2rem; }
+    .hud .box { min-width: 85px; padding: 6px 14px; }
+    .overlay h1 { font-size: 2.5rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="hud">
+    <div class="box">
+        <span class="label">TIME</span>
+        <span id="time">30</span>
+    </div>
+    <div class="box">
+        <span class="label">SCORE</span>
+        <span id="score">0</span>
+    </div>
+    <div class="box">
+        <span class="label">COMBO</span>
+        <span class="mult" id="mult">x1</span>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="overlay" id="startOverlay">
+    <h1>Peanut Catch!</h1>
+    <div class="sub">
+        Move your finger or mouse to guide the elephant!<br>
+        🥜 Catch peanuts to score points.<br>
+        🐭 Dodge the mice!<br>
+        Get 3 peanuts in a row for a combo bonus!
+    </div>
+    <button onclick="startGame()">START</button>
+    <button class="home" onclick="location.href='games.html'">🏠 Home</button>
+</div>
+
+<div class="overlay hidden" id="endOverlay">
+    <h1>Time's Up!</h1>
+    <div class="end-stats">
+        <div class="big" id="finalScore">0</div>
+        <div>Peanuts caught: <span id="peanutsCaught">0</span></div>
+        <div>Best combo: <span id="bestCombo">x1</span></div>
+    </div>
+    <button onclick="startGame()">PLAY AGAIN</button>
+    <button class="home" onclick="location.href='games.html'">🏠 Home</button>
+</div>
+
+<script>
+var canvas = document.getElementById('canvas');
+var ctx = canvas.getContext('2d');
+var W, H;
+
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Game state
+var running = false;
+var timeLeft = 30;
+var score = 0;
+var combo = 0;
+var bestCombo = 1;
+var peanutsCaught = 0;
+var falling = [];
+var popups = [];
+var mouseX = 0;
+var mouseY = 0;
+var lastSpawn = 0;
+var spawnInterval = 900;
+var timerInterval = null;
+var startTime = 0;
+
+// Set initial mouse pos
+function initMouse() {
+    mouseX = W / 2;
+    mouseY = H * 0.55;
+}
+initMouse();
+
+// Input handling
+function updatePointer(e) {
+    var rect = canvas.getBoundingClientRect();
+    var clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    mouseX = clientX - rect.left;
+    mouseY = clientY - rect.top;
+}
+canvas.addEventListener('mousemove', updatePointer);
+canvas.addEventListener('touchmove', function(e) { e.preventDefault(); updatePointer(e); }, { passive: false });
+canvas.addEventListener('touchstart', function(e) { e.preventDefault(); updatePointer(e); }, { passive: false });
+
+function startGame() {
+    document.getElementById('startOverlay').classList.add('hidden');
+    document.getElementById('endOverlay').classList.add('hidden');
+    timeLeft = 30;
+    score = 0;
+    combo = 0;
+    bestCombo = 1;
+    peanutsCaught = 0;
+    falling = [];
+    popups = [];
+    lastSpawn = performance.now();
+    startTime = performance.now();
+    running = true;
+    initMouse();
+    updateHUD();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(function() {
+        if (!running) return;
+        timeLeft--;
+        if (timeLeft <= 0) {
+            timeLeft = 0;
+            endGame();
+        }
+        updateHUD();
+    }, 1000);
+}
+
+function endGame() {
+    running = false;
+    clearInterval(timerInterval);
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('peanutsCaught').textContent = peanutsCaught;
+    document.getElementById('bestCombo').textContent = 'x' + getMultiplier(bestCombo);
+    document.getElementById('endOverlay').classList.remove('hidden');
+}
+
+function getMultiplier(c) {
+    if (c >= 9) return 4;
+    if (c >= 6) return 3;
+    if (c >= 3) return 2;
+    return 1;
+}
+
+function updateHUD() {
+    document.getElementById('time').textContent = timeLeft;
+    document.getElementById('score').textContent = score;
+    var m = getMultiplier(combo);
+    var multEl = document.getElementById('mult');
+    multEl.textContent = 'x' + m;
+    if (m > 1) multEl.classList.add('hot');
+    else multEl.classList.remove('hot');
+}
+
+function showPopup(text, color, x, y) {
+    var el = document.createElement('div');
+    el.className = 'popup';
+    el.textContent = text;
+    el.style.color = color;
+    el.style.left = (x - 40) + 'px';
+    el.style.top = y + 'px';
+    document.body.appendChild(el);
+    setTimeout(function() { el.remove(); }, 900);
+}
+
+function spawn() {
+    // ~70% peanut, ~30% mouse for toddler-friendly difficulty
+    var isPeanut = Math.random() < 0.72;
+    falling.push({
+        type: isPeanut ? 'peanut' : 'mouse',
+        x: 40 + Math.random() * (W - 80),
+        y: -40,
+        vy: isPeanut ? (60 + Math.random() * 40) : (55 + Math.random() * 35), // px/sec, slow for toddlers
+        rot: 0,
+        rotSpeed: (Math.random() - 0.5) * 2,
+        size: isPeanut ? 36 : 40,
+        caught: false
+    });
+}
+
+// Drawing
+function drawPeanut(x, y, size, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    // Peanut shape - two circles joined
+    ctx.fillStyle = '#D4A574';
+    ctx.strokeStyle = '#8B6F47';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.25, size * 0.45, size * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.25, size * 0.5, size * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Peanut texture lines
+    ctx.strokeStyle = '#8B6F47';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.3, 0);
+    ctx.lineTo(size * 0.3, 0);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawMouse(x, y, size, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot * 0.3);
+    var s = size / 40;
+    // Ears
+    ctx.fillStyle = '#C0C0C0';
+    ctx.strokeStyle = '#808080';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(-12 * s, -12 * s, 10 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(12 * s, -12 * s, 10 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Inner ears
+    ctx.fillStyle = '#FFB6C1';
+    ctx.beginPath();
+    ctx.arc(-12 * s, -12 * s, 5 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(12 * s, -12 * s, 5 * s, 0, Math.PI * 2);
+    ctx.fill();
+    // Body/head
+    ctx.fillStyle = '#A8A8A8';
+    ctx.strokeStyle = '#606060';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 18 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Nose
+    ctx.fillStyle = '#FF69B4';
+    ctx.beginPath();
+    ctx.arc(0, 10 * s, 3 * s, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(-6 * s, 2 * s, 2.5 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(6 * s, 2 * s, 2.5 * s, 0, Math.PI * 2);
+    ctx.fill();
+    // Whiskers
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-4 * s, 10 * s); ctx.lineTo(-14 * s, 8 * s);
+    ctx.moveTo(-4 * s, 11 * s); ctx.lineTo(-14 * s, 12 * s);
+    ctx.moveTo(4 * s, 10 * s); ctx.lineTo(14 * s, 8 * s);
+    ctx.moveTo(4 * s, 11 * s); ctx.lineTo(14 * s, 12 * s);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawElephant(trunkTipX, trunkTipY) {
+    var headCenterY = H + 40;
+    var headCenterX = W / 2;
+    var headR = Math.min(W * 0.18, 160);
+
+    // Body/head (big dome from bottom)
+    ctx.fillStyle = '#9AA0B0';
+    ctx.strokeStyle = '#5D6275';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(headCenterX, headCenterY, headR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Ears (big floppy)
+    ctx.fillStyle = '#8A90A0';
+    ctx.beginPath();
+    ctx.ellipse(headCenterX - headR * 0.9, headCenterY - headR * 0.2, headR * 0.5, headR * 0.7, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(headCenterX + headR * 0.9, headCenterY - headR * 0.2, headR * 0.5, headR * 0.7, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Eyes
+    var eyeY = headCenterY - headR * 0.4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(headCenterX - headR * 0.35, eyeY, headR * 0.12, 0, Math.PI * 2);
+    ctx.arc(headCenterX + headR * 0.35, eyeY, headR * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Pupils follow trunk tip
+    var pupilOffsetX = Math.max(-headR * 0.05, Math.min(headR * 0.05, (trunkTipX - headCenterX) * 0.02));
+    var pupilOffsetY = Math.max(-headR * 0.04, Math.min(headR * 0.04, (trunkTipY - eyeY) * 0.02));
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(headCenterX - headR * 0.35 + pupilOffsetX, eyeY + pupilOffsetY, headR * 0.06, 0, Math.PI * 2);
+    ctx.arc(headCenterX + headR * 0.35 + pupilOffsetX, eyeY + pupilOffsetY, headR * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Trunk base on the face
+    var trunkBaseX = headCenterX;
+    var trunkBaseY = headCenterY - headR * 0.15;
+
+    // Trunk as smooth curve from base to tip
+    var cp1x = trunkBaseX + (trunkTipX - trunkBaseX) * 0.3;
+    var cp1y = trunkBaseY - 40;
+    var cp2x = trunkBaseX + (trunkTipX - trunkBaseX) * 0.7;
+    var cp2y = trunkTipY + 30;
+
+    // Draw trunk in segments with varying width
+    ctx.strokeStyle = '#7A8090';
+    ctx.lineCap = 'round';
+    var steps = 20;
+    for (var i = 0; i < steps; i++) {
+        var t1 = i / steps;
+        var t2 = (i + 1) / steps;
+        var p1 = bezierPoint(trunkBaseX, trunkBaseY, cp1x, cp1y, cp2x, cp2y, trunkTipX, trunkTipY, t1);
+        var p2 = bezierPoint(trunkBaseX, trunkBaseY, cp1x, cp1y, cp2x, cp2y, trunkTipX, trunkTipY, t2);
+        ctx.lineWidth = 38 - t1 * 22; // tapers
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+    }
+    // Outline
+    ctx.strokeStyle = '#5D6275';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(trunkBaseX, trunkBaseY);
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, trunkTipX, trunkTipY);
+    ctx.stroke();
+
+    // Trunk tip (the catcher)
+    ctx.fillStyle = '#9AA0B0';
+    ctx.strokeStyle = '#5D6275';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(trunkTipX, trunkTipY, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Nostril
+    ctx.fillStyle = '#3D4250';
+    ctx.beginPath();
+    ctx.arc(trunkTipX - 6, trunkTipY, 3, 0, Math.PI * 2);
+    ctx.arc(trunkTipX + 6, trunkTipY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    return { tipX: trunkTipX, tipY: trunkTipY, tipR: 28 };
+}
+
+function bezierPoint(x0, y0, x1, y1, x2, y2, x3, y3, t) {
+    var u = 1 - t;
+    var tt = t * t;
+    var uu = u * u;
+    var uuu = uu * u;
+    var ttt = tt * t;
+    return {
+        x: uuu * x0 + 3 * uu * t * x1 + 3 * u * tt * x2 + ttt * x3,
+        y: uuu * y0 + 3 * uu * t * y1 + 3 * u * tt * y2 + ttt * y3
+    };
+}
+
+function drawBackground() {
+    // Sky gradient handled by body; draw ground
+    ctx.fillStyle = 'rgba(144, 238, 144, 0.6)';
+    ctx.fillRect(0, H - 60, W, 60);
+    // Sun
+    ctx.fillStyle = 'rgba(255, 235, 100, 0.9)';
+    ctx.beginPath();
+    ctx.arc(W - 80, 80, 40, 0, Math.PI * 2);
+    ctx.fill();
+    // Clouds
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    drawCloud(120, 90, 50);
+    drawCloud(W * 0.4, 60, 40);
+    drawCloud(W * 0.7, 120, 45);
+}
+
+function drawCloud(x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.8, y + 5, r * 0.8, 0, Math.PI * 2);
+    ctx.arc(x - r * 0.8, y + 5, r * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+var lastFrame = performance.now();
+function loop(now) {
+    var dt = Math.min(50, now - lastFrame) / 1000;
+    lastFrame = now;
+
+    ctx.clearRect(0, 0, W, H);
+    drawBackground();
+
+    // Clamp trunk tip inside screen
+    var tipX = Math.max(30, Math.min(W - 30, mouseX));
+    var tipY = Math.max(80, Math.min(H - 100, mouseY));
+    var trunk = drawElephant(tipX, tipY);
+
+    if (running) {
+        // Spawn
+        if (now - lastSpawn > spawnInterval) {
+            spawn();
+            lastSpawn = now;
+            // Gentle ramp: faster spawns later
+            var elapsed = (now - startTime) / 1000;
+            spawnInterval = Math.max(550, 900 - elapsed * 12);
+        }
+
+        // Update falling
+        for (var i = falling.length - 1; i >= 0; i--) {
+            var f = falling[i];
+            f.y += f.vy * dt;
+            f.rot += f.rotSpeed * dt;
+
+            // Collision with trunk tip
+            var dx = f.x - trunk.tipX;
+            var dy = f.y - trunk.tipY;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (!f.caught && dist < trunk.tipR + f.size * 0.4) {
+                f.caught = true;
+                if (f.type === 'peanut') {
+                    combo++;
+                    if (combo > bestCombo) bestCombo = combo;
+                    var mult = getMultiplier(combo);
+                    var pts = 1 * mult;
+                    score += pts;
+                    peanutsCaught++;
+                    showPopup('+' + pts, '#FFD700', f.x, f.y);
+                } else {
+                    score = Math.max(0, score - 5);
+                    combo = 0;
+                    showPopup('-5', '#FF4444', f.x, f.y);
+                }
+                updateHUD();
+                falling.splice(i, 1);
+                continue;
+            }
+
+            // Off screen bottom
+            if (f.y > H + 50) {
+                if (f.type === 'peanut') {
+                    combo = 0;
+                    updateHUD();
+                }
+                falling.splice(i, 1);
+            }
+        }
+    }
+
+    // Draw falling items
+    for (var j = 0; j < falling.length; j++) {
+        var item = falling[j];
+        if (item.type === 'peanut') drawPeanut(item.x, item.y, item.size, item.rot);
+        else drawMouse(item.x, item.y, item.size, item.rot);
+    }
+
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
