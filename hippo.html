@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#4FC3F7">
+<title>Hippo Chomp!</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka One', cursive;
+    background: linear-gradient(to bottom, #4FC3F7 0%, #81D4FA 40%, #4DB6AC 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    color: #fff;
+    text-shadow: 3px 3px #00695C;
+    margin-top: 1rem;
+  }
+
+  .round-indicator {
+    font-size: 1.1rem;
+    color: #004D40;
+    margin: 0.3rem 0 0;
+  }
+
+  .progress {
+    display: flex;
+    gap: 0.6rem;
+    margin: 0.5rem 0;
+  }
+
+  .dot {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+    border: 2px solid #fff;
+    transition: background 0.3s, transform 0.3s;
+  }
+
+  .dot.active { background: #f9ca24; transform: scale(1.25); }
+  .dot.correct { background: #2ecc71; }
+  .dot.wrong { background: #e74c3c; }
+
+  .speech-bubble {
+    background: #fff;
+    border-radius: 1.5rem;
+    padding: 0.8rem 1.5rem;
+    font-size: 1.5rem;
+    color: #2d3436;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    position: relative;
+    margin: 0.5rem 0 1rem;
+    text-align: center;
+    max-width: 90vw;
+  }
+
+  .speech-bubble .big-num {
+    font-size: 2.2rem;
+    color: #e17055;
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 16px solid #fff;
+  }
+
+  .hippo {
+    font-size: 7rem;
+    line-height: 1;
+    transition: transform 0.2s;
+    cursor: pointer;
+  }
+
+  .hippo.chomp { animation: chomp 0.4s ease; }
+  .hippo.happy { animation: happy 0.6s ease 2; }
+  .hippo.dizzy { animation: dizzy 0.5s ease 2; }
+
+  @keyframes chomp {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2) rotate(-8deg); }
+  }
+  @keyframes happy {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-15deg) translateY(-20px); }
+    75% { transform: rotate(15deg) translateY(-20px); }
+  }
+  @keyframes dizzy {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-15px) rotate(-8deg); }
+    75% { transform: translateX(15px) rotate(8deg); }
+  }
+
+  /* Tummy - melons fed so far */
+  .tummy {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    min-height: 3.2rem;
+    max-width: 500px;
+    margin: 0.3rem 0;
+  }
+
+  .tummy .fed {
+    font-size: 2.6rem;
+    padding: 0.15rem;
+    cursor: pointer;
+    animation: popIn 0.3s ease;
+    transition: transform 0.15s;
+  }
+
+  .tummy .fed:active { transform: scale(0.8); }
+
+  @keyframes popIn {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+  }
+
+  .count-display {
+    font-size: 3rem;
+    color: #fff;
+    text-shadow: 3px 3px #00695C;
+    min-height: 4rem;
+  }
+
+  .hint { font-size: 0.9rem; color: #004D40; margin-bottom: 0.5rem; }
+
+  /* River of melons */
+  .river {
+    background: rgba(255,255,255,0.25);
+    border: 3px dashed rgba(255,255,255,0.7);
+    border-radius: 2rem;
+    padding: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    max-width: 600px;
+    min-height: 6rem;
+    margin: 0.5rem 1rem;
+  }
+
+  .melon {
+    font-size: 3.2rem;
+    line-height: 1;
+    cursor: pointer;
+    animation: bob 2s ease-in-out infinite;
+    transition: transform 0.15s;
+  }
+
+  .melon:active { transform: scale(1.3); }
+  .melon:nth-child(2n) { animation-delay: 0.4s; }
+  .melon:nth-child(3n) { animation-delay: 0.8s; }
+  .melon:nth-child(4n) { animation-delay: 1.2s; }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) rotate(-4deg); }
+    50% { transform: translateY(-10px) rotate(4deg); }
+  }
+
+  .burp-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.6rem;
+    padding: 0.8rem 2.5rem;
+    border: none;
+    border-radius: 2rem;
+    background: linear-gradient(to bottom, #FF9800, #F57C00);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 5px #E65100;
+    margin: 0.8rem 0;
+    visibility: hidden;
+  }
+
+  .burp-btn:active { box-shadow: 0 2px #E65100; transform: translateY(3px); }
+
+  .feedback {
+    font-size: 1.6rem;
+    min-height: 2.2rem;
+    color: #fff;
+    text-shadow: 2px 2px #00695C;
+    margin-bottom: 1rem;
+    text-align: center;
+    padding: 0 1rem;
+  }
+
+  /* End screen */
+  .end-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 2rem;
+    animation: fadeIn 0.6s ease;
+  }
+
+  .end-screen .trophy { font-size: 6rem; }
+  .end-screen .score-text { font-size: 2rem; color: #fff; text-shadow: 2px 2px #00695C; margin: 1rem 0; }
+  .end-screen .score-msg { font-size: 1.3rem; color: #004D40; margin-bottom: 1.5rem; text-align: center; padding: 0 1rem; }
+
+  .end-btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.4rem;
+    padding: 0.8rem 2.5rem;
+    border: none;
+    border-radius: 2rem;
+    color: #fff;
+    cursor: pointer;
+    margin: 0.4rem;
+  }
+
+  .play-again-btn { background: linear-gradient(to bottom, #4CAF50, #45a049); box-shadow: 0 5px #2d6a2f; }
+  .home-btn { background: linear-gradient(to bottom, #2196F3, #1976D2); box-shadow: 0 5px #1565C0; font-size: 1.1rem; }
+  .end-btn:active { transform: translateY(3px); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  /* Compact layout so a full round fits on a phone screen without scrolling */
+  @media (max-width: 500px), (max-height: 750px) {
+    h1 { font-size: 1.6rem; margin-top: 0.5rem; }
+    .round-indicator { font-size: 0.9rem; }
+    .progress { margin: 0.3rem 0; }
+    .speech-bubble { font-size: 1.15rem; padding: 0.6rem 1.1rem; margin: 0.4rem 0 0.9rem; }
+    .speech-bubble .big-num { font-size: 1.8rem; }
+    .hippo { font-size: 4.5rem; }
+    .tummy { min-height: 2.8rem; }
+    .tummy .fed { font-size: 2.3rem; }
+    .hint { font-size: 0.75rem; }
+    .count-display { font-size: 2.2rem; min-height: 2.8rem; }
+    .river { padding: 0.7rem; gap: 0.7rem; min-height: 5rem; margin: 0.3rem 0.6rem; }
+    .melon { font-size: 2.9rem; }
+    .burp-btn { font-size: 1.3rem; padding: 0.7rem 2rem; margin: 0.5rem 0; }
+    .feedback { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Hippo Chomp! 🦛</h1>
+<div class="round-indicator" id="roundIndicator"></div>
+<div class="progress" id="progress"></div>
+
+<div class="game-area" id="gameArea">
+  <div class="speech-bubble" id="speechBubble"></div>
+  <div class="hippo" id="hippo">🦛</div>
+  <div class="tummy" id="tummy"></div>
+  <div class="hint">Tap a melon in the tummy to take it back!</div>
+  <div class="count-display" id="countDisplay">0</div>
+  <div class="river" id="river"></div>
+  <button class="burp-btn" id="burpBtn">Burp! 🫧</button>
+  <div class="feedback" id="feedback"></div>
+</div>
+
+<div class="end-screen" id="endScreen">
+  <div class="trophy">🏆</div>
+  <div class="score-text" id="scoreText"></div>
+  <div class="score-msg" id="scoreMsg"></div>
+  <button class="end-btn play-again-btn" id="playAgainBtn">Play Again!</button>
+  <button class="end-btn home-btn" onclick="location.href='games.html'">🏠 More Games</button>
+</div>
+
+<script>
+  var TOTAL_ROUNDS = 8;
+  var currentRound = 0;
+  var target = 0;
+  var fedCount = 0;
+  var firstTryCorrect = 0;
+  var usedAttempt = false;
+  var checking = false;
+
+  var progressEl = document.getElementById('progress');
+  var roundIndicatorEl = document.getElementById('roundIndicator');
+  var speechBubbleEl = document.getElementById('speechBubble');
+  var hippoEl = document.getElementById('hippo');
+  var tummyEl = document.getElementById('tummy');
+  var countDisplayEl = document.getElementById('countDisplay');
+  var riverEl = document.getElementById('river');
+  var burpBtnEl = document.getElementById('burpBtn');
+  var feedbackEl = document.getElementById('feedback');
+  var gameAreaEl = document.getElementById('gameArea');
+  var endScreenEl = document.getElementById('endScreen');
+  var scoreTextEl = document.getElementById('scoreText');
+  var scoreMsgEl = document.getElementById('scoreMsg');
+  var playAgainBtnEl = document.getElementById('playAgainBtn');
+
+  function targetForRound(round) {
+    // rounds 0-2: count 1-3, rounds 3-5: count 3-6, rounds 6-7: count 6-9
+    if (round < 3) return 1 + Math.floor(Math.random() * 3);
+    if (round < 6) return 3 + Math.floor(Math.random() * 4);
+    return 6 + Math.floor(Math.random() * 4);
+  }
+
+  function setSpeech(before, num, after) {
+    speechBubbleEl.textContent = '';
+    if (before) speechBubbleEl.appendChild(document.createTextNode(before));
+    if (num !== null) {
+      var span = document.createElement('span');
+      span.className = 'big-num';
+      span.textContent = String(num);
+      speechBubbleEl.appendChild(span);
+    }
+    if (after) speechBubbleEl.appendChild(document.createTextNode(after));
+  }
+
+  function buildProgress() {
+    progressEl.textContent = '';
+    for (var i = 0; i < TOTAL_ROUNDS; i++) {
+      var dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.setAttribute('data-index', String(i));
+      progressEl.appendChild(dot);
+    }
+  }
+
+  function updateDot(index, state) {
+    var dot = progressEl.querySelector('[data-index="' + index + '"]');
+    if (dot) {
+      dot.classList.remove('active');
+      dot.classList.add(state);
+    }
+  }
+
+  function highlightDot(index) {
+    var dots = progressEl.querySelectorAll('.dot');
+    for (var i = 0; i < dots.length; i++) dots[i].classList.remove('active');
+    if (index < TOTAL_ROUNDS) dots[index].classList.add('active');
+  }
+
+  function startGame() {
+    currentRound = 0;
+    firstTryCorrect = 0;
+    endScreenEl.style.display = 'none';
+    gameAreaEl.style.display = 'flex';
+    buildProgress();
+    showRound();
+  }
+
+  function showRound() {
+    target = targetForRound(currentRound);
+    fedCount = 0;
+    usedAttempt = false;
+    checking = false;
+
+    highlightDot(currentRound);
+    roundIndicatorEl.textContent = 'Round ' + (currentRound + 1) + ' of ' + TOTAL_ROUNDS;
+    setSpeech('Feed me ', target, ' watermelon' + (target > 1 ? 's' : '') + '!');
+    hippoEl.className = 'hippo';
+    tummyEl.textContent = '';
+    countDisplayEl.textContent = '0';
+    feedbackEl.textContent = '';
+    burpBtnEl.style.visibility = 'hidden';
+
+    // Float more melons than needed so counting matters
+    var extras = 2 + Math.floor(Math.random() * 3);
+    riverEl.textContent = '';
+    for (var i = 0; i < target + extras; i++) {
+      var melon = document.createElement('div');
+      melon.className = 'melon';
+      melon.textContent = '🍉';
+      melon.addEventListener('click', feedMelon);
+      riverEl.appendChild(melon);
+    }
+  }
+
+  function feedMelon(e) {
+    if (checking) return;
+    var melon = e.currentTarget;
+    melon.remove();
+
+    fedCount++;
+    countDisplayEl.textContent = String(fedCount);
+
+    hippoEl.className = 'hippo';
+    void hippoEl.offsetWidth; // restart animation
+    hippoEl.className = 'hippo chomp';
+
+    var fed = document.createElement('div');
+    fed.className = 'fed';
+    fed.textContent = '🍉';
+    fed.addEventListener('click', unfeedMelon);
+    tummyEl.appendChild(fed);
+
+    burpBtnEl.style.visibility = 'visible';
+  }
+
+  function unfeedMelon(e) {
+    if (checking) return;
+    e.currentTarget.remove();
+    fedCount--;
+    countDisplayEl.textContent = String(fedCount);
+    if (fedCount === 0) burpBtnEl.style.visibility = 'hidden';
+
+    var melon = document.createElement('div');
+    melon.className = 'melon';
+    melon.textContent = '🍉';
+    melon.addEventListener('click', feedMelon);
+    riverEl.appendChild(melon);
+  }
+
+  burpBtnEl.addEventListener('click', function() {
+    if (checking || fedCount === 0) return;
+    checking = true;
+    burpBtnEl.style.visibility = 'hidden';
+
+    if (fedCount === target) {
+      hippoEl.className = 'hippo happy';
+      setSpeech('BUUURP! Just right! 😋', null, '');
+      feedbackEl.textContent = '⭐ Perfect! ' + target + ' watermelon' + (target > 1 ? 's' : '') + '!';
+      if (!usedAttempt) {
+        firstTryCorrect++;
+        updateDot(currentRound, 'correct');
+      }
+      setTimeout(function() {
+        currentRound++;
+        if (currentRound >= TOTAL_ROUNDS) showEndScreen();
+        else showRound();
+      }, 1800);
+    } else {
+      hippoEl.className = 'hippo dizzy';
+      if (fedCount > target) {
+        setSpeech('Too many! My tummy hurts! 🤢', null, '');
+        feedbackEl.textContent = 'I asked for ' + target + ', that was ' + fedCount + '. Take some back!';
+      } else {
+        setSpeech("I'm still hungry! 🥺", null, '');
+        feedbackEl.textContent = 'I asked for ' + target + ', that was only ' + fedCount + '. Feed me more!';
+      }
+      if (!usedAttempt) {
+        usedAttempt = true;
+        updateDot(currentRound, 'wrong');
+      }
+      setTimeout(function() {
+        checking = false;
+        burpBtnEl.style.visibility = 'visible';
+        hippoEl.className = 'hippo';
+      }, 1500);
+    }
+  });
+
+  function showEndScreen() {
+    gameAreaEl.style.display = 'none';
+    endScreenEl.style.display = 'flex';
+    roundIndicatorEl.textContent = '';
+
+    scoreTextEl.textContent = firstTryCorrect + ' out of ' + TOTAL_ROUNDS + ' on the first try!';
+
+    var msg;
+    if (firstTryCorrect === TOTAL_ROUNDS) msg = 'Perfect! You are a Counting Champion! 🌟';
+    else if (firstTryCorrect >= 6) msg = 'Amazing! The hippo is so happy! 🦛';
+    else if (firstTryCorrect >= 4) msg = 'Great counting! Keep practicing! 💪';
+    else msg = 'Good try! The hippo wants to play again! 🦛';
+    scoreMsgEl.textContent = msg;
+  }
+
+  playAgainBtnEl.addEventListener('click', startGame);
+
+  startGame();
+</script>
+</body>
+</html>
